@@ -42,14 +42,28 @@ docker run hello-world
 
 ## 启动翻译服务器
 
-下面只加载英文和中文模型，并使用 Mac 的 `5001` 端口：
+默认加载英语、日语和中文模型，覆盖常用的英语→中文和日语→中文翻译，并使用
+Mac 的 `5001` 端口：
 
 ```bash
 docker run -d \
   --name netflix-translator \
   --restart unless-stopped \
   -p 5001:5000 \
-  -e LT_LOAD_ONLY=en,zh \
+  -e LT_LOAD_ONLY=en,ja,zh \
+  libretranslate/libretranslate
+```
+
+如果之前创建的是只含 `en,zh` 的旧容器，需要重新创建一次，日语模型才会下载：
+
+```bash
+docker stop netflix-translator
+docker rm netflix-translator
+docker run -d \
+  --name netflix-translator \
+  --restart unless-stopped \
+  -p 5001:5000 \
+  -e LT_LOAD_ONLY=en,ja,zh \
   libretranslate/libretranslate
 ```
 
@@ -143,9 +157,10 @@ API Key 留空，然后保存。
 
 1. 在 Netflix 中选择日语字幕。
 2. 在扩展设置中把“源语言”改为 `ja`，“目标语言”保持 `zh`。
-3. 确保 LibreTranslate 容器加载了日语和中文模型。
+3. 保存设置并刷新 Netflix 页面。
 
-如果当前容器只加载了 `en,zh`，需要重新创建容器：
+README 中的默认容器已经加载 `en,ja,zh`，因此英语和日语之间切换时无需重新创建
+容器。如果还需要韩语等其他语言，则要把对应代码加入 `LT_LOAD_ONLY`。例如增加韩语：
 
 ```bash
 docker stop netflix-translator
