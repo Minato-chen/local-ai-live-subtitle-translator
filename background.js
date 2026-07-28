@@ -58,6 +58,7 @@ async function translateWithOllama(text, context, settings) {
 
   const payload = {
     model: settings.ollamaModel,
+    think: false,
     stream: false,
     keep_alive: "30m",
     messages: [

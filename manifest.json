@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Netflix 实时中文字幕",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "读取 Netflix 字幕，通过 LibreTranslate 或 Ollama 实时显示中文翻译。",
   "permissions": ["storage"],
   "host_permissions": [
