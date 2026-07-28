@@ -41,6 +41,8 @@
 }
 
 #nf-zh-overlay .nf-zh-status:empty,
+#nf-zh-overlay .nf-zh-source:empty,
+#nf-zh-overlay .nf-zh-translation:empty,
 #nf-zh-overlay .nf-zh-hidden,
 #nf-zh-overlay.nf-zh-disabled {
   display: none;
