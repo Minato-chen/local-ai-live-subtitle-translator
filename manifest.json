@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Netflix 实时中文字幕",
+  "version": "1.0.0",
+  "description": "读取 Netflix 英文字幕，通过 LibreTranslate 实时显示中文翻译。",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.netflix.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://libretranslate.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.netflix.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html",
+  "action": {
+    "default_title": "Netflix 实时中文字幕",
+    "default_popup": "popup.html"
+  }
+}

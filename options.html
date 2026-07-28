@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Netflix 实时中文字幕设置</title>
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body>
+  <main>
+    <h1>Netflix 实时中文字幕</h1>
+    <p class="hint">推荐使用本机 LibreTranslate。字幕只会发送到你填写的翻译地址。</p>
+    <label>LibreTranslate 接口地址
+      <input id="endpoint" type="url" placeholder="http://127.0.0.1:5000/translate">
+    </label>
+    <label>API Key（本机服务通常留空）
+      <input id="apiKey" type="password" autocomplete="off">
+    </label>
+    <div class="row">
+      <label>源语言<input id="source" value="en"></label>
+      <label>目标语言<input id="target" value="zh"></label>
+      <label>中文字幕字号<input id="fontSize" type="number" min="16" max="60"></label>
+    </div>
+    <label class="check"><input id="bilingual" type="checkbox"> 在翻译框内复制英文原文（Netflix 原字幕仍会保留）</label>
+    <button id="save">保存设置</button>
+    <span id="status"></span>
+    <section>
+      <h2>本机启动 LibreTranslate</h2>
+      <code>docker run -ti --rm -p 5000:5000 libretranslate/libretranslate</code>
+      <p class="hint">首次启动会下载语言模型。启动后，在 Netflix 播放器中选择英文字幕即可。</p>
+    </section>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>
