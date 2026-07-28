@@ -444,6 +444,11 @@ docker logs -f netflix-translator
 - 在 `edge://extensions` 重新加载扩展，然后刷新 Netflix。
 - Netflix 改版后字幕 DOM 可能变化，需要更新 `content.js` 中的选择器。
 
+### 同一句字幕重复两遍
+
+旧版本在部分 Netflix 字幕 DOM 中会同时读取嵌套的父级和子级 `span`，导致同一句话
+被拼接两次。请升级到 `1.2.2` 或更高版本，重新加载扩展并刷新 Netflix 页面。
+
 ### `Cannot read properties of undefined (reading 'sendMessage')`
 
 这通常发生在扩展刚刚重新加载，但 Netflix 标签页仍运行旧内容脚本时。刷新 Netflix

@@ -82,10 +82,7 @@ function findSubtitleContainer() {
 }
 
 function readSubtitle(container) {
-  const lines = [...container.querySelectorAll("span")]
-    .map((span) => span.textContent.trim())
-    .filter(Boolean);
-  const text = (lines.length ? [...new Set(lines)].join(" ") : container.textContent)
+  const text = (container.innerText || container.textContent || "")
     .replace(/\s+/g, " ")
     .trim();
   return text;
