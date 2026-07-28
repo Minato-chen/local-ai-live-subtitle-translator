@@ -52,6 +52,66 @@
 修改扩展代码或更新版本后，需要在 `edge://extensions` 点击“重新加载”，并刷新
 Netflix 页面。
 
+## 结束观看后释放后台资源
+
+关闭 Netflix 标签页只会停止新的翻译请求。扩展会要求 Ollama 将模型保留在内存中
+最多 30 分钟，以便连续字幕快速响应；如果希望立即释放内存，需要手动停止模型。
+
+### 使用 Ollama 时
+
+只卸载当前模型、立即释放模型占用的内存：
+
+```text
+ollama stop maternion/hy-mt2:1.8b
+```
+
+确认没有模型仍在运行：
+
+```text
+ollama ps
+```
+
+这种方式会保留轻量的 Ollama 后台服务，下次观看时无需重新启动应用，扩展会自动
+重新加载模型。
+
+如果希望完全退出 Ollama：
+
+- macOS：点击菜单栏的 Ollama 图标，选择 `Quit Ollama`。
+- Windows：右键系统托盘中的 Ollama 图标，选择 `Quit`。
+- 如果是在终端运行 `ollama serve`，回到该终端按 `Control + C`。
+
+下次使用时，从“应用程序”或 Windows“开始”菜单重新打开 Ollama。停止或退出不会
+删除已下载模型。
+
+### 使用 LibreTranslate 时
+
+停止翻译容器：
+
+```text
+docker stop netflix-translator
+```
+
+下次使用：
+
+```text
+docker start netflix-translator
+```
+
+停止容器不会删除容器或语言模型。如果没有其他容器需要运行，还可以从菜单栏或系统
+托盘退出 Docker Desktop，进一步释放内存。不要运行 `docker rm`，除非确定要删除
+容器并重新创建。
+
+### 最推荐的日常操作
+
+默认 Hy-MT2 模式看完后只需运行：
+
+```text
+ollama stop maternion/hy-mt2:1.8b
+```
+
+这样能立即释放大部分相关内存，同时保留 Ollama 服务，下一次打开 Netflix 仍可直接
+使用。
+
 ---
 
 ## 方案一：LibreTranslate 快速模式
