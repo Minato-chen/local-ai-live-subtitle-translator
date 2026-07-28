@@ -444,6 +444,11 @@ docker logs -f netflix-translator
 - 在 `edge://extensions` 重新加载扩展，然后刷新 Netflix。
 - Netflix 改版后字幕 DOM 可能变化，需要更新 `content.js` 中的选择器。
 
+### `Cannot read properties of undefined (reading 'sendMessage')`
+
+这通常发生在扩展刚刚重新加载，但 Netflix 标签页仍运行旧内容脚本时。刷新 Netflix
+页面即可。`1.2.1` 及以上版本会把底层错误替换成明确的刷新提示。
+
 ---
 
 ## 是否可以长期免费使用

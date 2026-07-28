@@ -125,7 +125,11 @@ async function requestTranslation(text, context) {
 
   translatedLine.textContent = "翻译中…";
   try {
-    const response = await chrome.runtime.sendMessage({ type: "TRANSLATE", text, context });
+    const runtime = globalThis.chrome?.runtime;
+    if (!runtime?.sendMessage) {
+      throw new Error("扩展已更新，请刷新 Netflix 页面");
+    }
+    const response = await runtime.sendMessage({ type: "TRANSLATE", text, context });
     if (version !== requestVersion || text !== lastSource) return;
     if (!response?.ok) throw new Error(response?.error || "翻译失败");
     cache.set(cacheKey, response.translatedText);
