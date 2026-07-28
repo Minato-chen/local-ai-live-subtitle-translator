@@ -178,9 +178,36 @@ Ollama 在本机运行开源大语言模型。扩展会提供最近几条字幕�
 | 模型 | 大小约 | 推荐用途 |
 | --- | ---: | --- |
 | `qwen3:1.7b` | 1.4 GB | 实时优先，M1 16GB 和普通 Windows 电脑推荐 |
+| `maternion/hy-mt2:1.8b` | 1.1 GB | 专用翻译模型，支持自动识别源语言 |
 | `qwen3:4b-instruct` | 2.5 GB | 质量优先，速度较慢 |
 
 模型大小只是下载体积，运行时还会占用额外内存。实时字幕建议先用 `qwen3:1.7b`。
+
+### 试用 Hy-MT2 1.8B
+
+Hy-MT2 是专用多语言翻译模型。扩展会根据模型名自动使用它要求的提示格式，无需手工
+修改提示词。
+
+下载 Ollama 社区打包版本：
+
+```text
+ollama pull maternion/hy-mt2:1.8b
+```
+
+扩展设置：
+
+```text
+翻译方式：Ollama 本地 AI
+接口地址：http://127.0.0.1:11434/api/chat
+模型：maternion/hy-mt2:1.8b
+参考前文条数：1
+源语言：auto
+目标语言：zh
+```
+
+`auto` 会让模型自动识别英语、日语等输入语言。日语输入仍会启用假名残留检查和严格
+重试。该 Ollama 包由社区打包；底层模型和官方 GGUF 权重来自
+[腾讯 Hy-MT2](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF)。
 
 ### macOS
 

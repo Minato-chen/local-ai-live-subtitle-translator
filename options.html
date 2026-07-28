@@ -36,10 +36,11 @@
           <input id="contextLines" type="number" min="0" max="8">
         </label>
       </div>
-      <p class="hint">M1 16GB 推荐 qwen3:4b-instruct；首次使用前运行 <code class="inline">ollama pull qwen3:4b-instruct</code>。</p>
+      <p class="hint">实时优先可用 qwen3:1.7b；专用翻译可用 Hy-MT2 1.8B；质量优先可用 qwen3:4b-instruct。</p>
+      <p class="hint">自动识别语言可将源语言设为 <code class="inline">auto</code>。Hy-MT2 模型名为 <code class="inline">maternion/hy-mt2:1.8b</code>。</p>
     </div>
     <div class="row">
-      <label>源语言<input id="source" value="en"></label>
+      <label>源语言<input id="source" value="en" placeholder="自动识别填 auto"></label>
       <label>目标语言<input id="target" value="zh"></label>
       <label>中文字幕字号<input id="fontSize" type="number" min="16" max="60"></label>
     </div>
