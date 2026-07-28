@@ -2,10 +2,16 @@ const DEFAULTS = {
   enabled: true,
   bilingual: false,
   fontSize: 28,
-  delayMs: 180
+  delayMs: 180,
+  provider: "libretranslate",
+  source: "en",
+  target: "zh",
+  ollamaModel: "qwen3:4b-instruct",
+  contextLines: 3
 };
 
 const cache = new Map();
+const subtitleHistory = [];
 let settings = { ...DEFAULTS };
 let lastSource = "";
 let requestVersion = 0;
@@ -22,6 +28,8 @@ async function init() {
   createOverlay();
   chrome.storage.onChanged.addListener((changes) => {
     for (const [key, value] of Object.entries(changes)) settings[key] = value.newValue;
+    cache.clear();
+    subtitleHistory.length = 0;
     applySettings();
     scanSubtitles();
   });
@@ -97,24 +105,30 @@ function scanSubtitles() {
   lastSource = text;
   sourceLine.textContent = text;
   statusLine.textContent = "";
+  const context = subtitleHistory.slice(-Math.max(0, Number(settings.contextLines) || 0));
+  subtitleHistory.push(text);
+  if (subtitleHistory.length > 20) subtitleHistory.shift();
 
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => requestTranslation(text), settings.delayMs);
+  debounceTimer = setTimeout(() => requestTranslation(text, context), settings.delayMs);
 }
 
-async function requestTranslation(text) {
+async function requestTranslation(text, context) {
   const version = ++requestVersion;
-  if (cache.has(text)) {
-    showTranslation(cache.get(text), version);
+  const cacheKey = settings.provider === "ollama"
+    ? JSON.stringify([settings.provider, settings.ollamaModel, settings.source, settings.target, context, text])
+    : JSON.stringify([settings.provider, settings.source, settings.target, text]);
+  if (cache.has(cacheKey)) {
+    showTranslation(cache.get(cacheKey), version);
     return;
   }
 
   translatedLine.textContent = "翻译中…";
   try {
-    const response = await chrome.runtime.sendMessage({ type: "TRANSLATE", text });
+    const response = await chrome.runtime.sendMessage({ type: "TRANSLATE", text, context });
     if (version !== requestVersion || text !== lastSource) return;
     if (!response?.ok) throw new Error(response?.error || "翻译失败");
-    cache.set(text, response.translatedText);
+    cache.set(cacheKey, response.translatedText);
     if (cache.size > 300) cache.delete(cache.keys().next().value);
     showTranslation(response.translatedText, version);
   } catch (error) {

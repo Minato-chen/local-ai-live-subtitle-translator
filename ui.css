@@ -22,13 +22,16 @@ main {
 
 h1, h2 { margin-top: 0; }
 label { display: block; margin: 18px 0; }
-input:not([type="checkbox"]) {
+input:not([type="checkbox"]),
+select {
   box-sizing: border-box;
   width: 100%;
   margin-top: 7px;
   padding: 9px;
 }
 .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.row.two { grid-template-columns: 2fr 1fr; }
+.provider-settings[hidden] { display: none; }
 .check { display: flex; align-items: center; gap: 8px; }
 button {
   cursor: pointer;
@@ -43,3 +46,4 @@ button {
 .hint { color: #aaa; line-height: 1.5; }
 section { margin-top: 36px; border-top: 1px solid #444; padding-top: 24px; }
 code { display: block; overflow-x: auto; padding: 12px; background: #222; }
+code.inline { display: inline; padding: 2px 5px; }

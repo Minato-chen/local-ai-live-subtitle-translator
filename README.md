@@ -9,6 +9,8 @@ Netflix 播放器当前显示的字幕，通过本机运行的开源
 - 实时读取 Netflix 当前字幕并显示中文翻译
 - 默认保留 Netflix 原字幕，形成双语字幕
 - 本机离线翻译，字幕不需要发送给第三方翻译平台
+- 可选择 LibreTranslate 快速模式或 Ollama 高质量模式
+- Ollama 模式可参考最近几条字幕，改善日语省略主语和对话语境
 - 字幕去重和翻译结果缓存，减少重复计算
 - 支持开关翻译、调整字号和切换源语言/目标语言
 - 支持自建或远程 LibreTranslate 接口
@@ -17,8 +19,9 @@ Netflix 播放器当前显示的字幕，通过本机运行的开源
 
 1. `content.js` 使用 `MutationObserver` 监测 Netflix 播放器字幕节点。
 2. 检测到新字幕后，扩展进行文本清理、去重和短暂防抖。
-3. 字幕通过扩展后台脚本发送至 LibreTranslate 的 `/translate` 接口。
-4. LibreTranslate 使用开源 Argos Translate 模型在本机完成推理。
+3. 字幕通过扩展后台脚本发送至所选的本机翻译服务。
+4. LibreTranslate 使用 Argos Translate 快速逐句翻译；Ollama 使用本地大语言模型并
+   参考最近几条字幕。
 5. 返回的译文由扩展叠加在播放器上，并缓存在浏览器内存中。
 
 扩展只读取屏幕上已经显示的字幕，不破解 Netflix DRM，不下载视频，也不提取完整字幕文件。
@@ -131,13 +134,58 @@ http://127.0.0.1:5001/translate
 
 API Key 留空，然后保存。
 
+## Ollama 高质量翻译
+
+LibreTranslate 速度快、资源占用低，但日语口语、敬语和省略主语的翻译质量有限。
+Ollama 模式会把最近几条字幕作为语境发送给本机模型，更适合影视日语。
+
+### M1 16GB 推荐配置
+
+安装 [Ollama](https://ollama.com/download/mac)，启动应用，然后在终端下载约
+2.5 GB 的模型：
+
+```bash
+ollama pull qwen3:4b-instruct
+```
+
+在扩展设置中选择：
+
+```text
+翻译方式：Ollama 本地 AI
+接口地址：http://127.0.0.1:11434/api/chat
+模型：qwen3:4b-instruct
+参考前文条数：3
+```
+
+Ollama 应用必须保持运行，但 Ollama 模式不需要启动 LibreTranslate Docker 容器。
+第一次翻译可能因为模型加载而稍慢，之后会明显加快。模型在本机运行，不按调用次数
+收费。`qwen3:4b-instruct` 是非思考版，更适合低延迟字幕翻译。
+
+如需测试 Ollama：
+
+```bash
+curl http://127.0.0.1:11434/api/chat \
+  -d '{
+    "model": "qwen3:4b-instruct",
+    "stream": false,
+    "messages": [{"role": "user", "content": "把「お疲れ様でした」翻译成中文，只输出译文"}]
+  }'
+```
+
+### 两种模式对比
+
+| 模式 | 优点 | 局限 |
+| --- | --- | --- |
+| LibreTranslate | 启动快、延迟低、资源占用少 | 逐句翻译，日语语境和口语质量一般 |
+| Ollama | 翻译自然，可利用前文语境 | 首次加载较慢，占用更多内存 |
+
 ## 使用
 
 1. 打开 Netflix 并播放视频。
 2. 在 Netflix 自带字幕菜单中选择英文字幕。
 3. 等待片刻，中文译文会显示在原字幕上方。
 
-扩展弹窗可以临时关闭翻译；设置页面可以调整字号和语言。
+扩展弹窗可以临时关闭翻译；设置页面可以调整翻译方式、字号和语言。
 
 ## 切换语言
 
@@ -198,12 +246,15 @@ curl http://127.0.0.1:5001/languages
 如果改用 `https://libretranslate.com/translate` 等公共服务，则可能要求 API Key、
 收费或限制调用频率，字幕也会被发送到远程服务器。
 
+使用本机 Ollama 时同样没有按请求计费或公共 API 配额，但会持续使用本机内存和
+计算资源。
+
 ## 隐私
 
 默认配置下，字幕只在以下位置之间传递：
 
 ```text
-Netflix 页面 → Edge 扩展后台 → 本机 LibreTranslate
+Netflix 页面 → Edge 扩展后台 → 本机 LibreTranslate 或 Ollama
 ```
 
 扩展不会主动保存观看历史或上传字幕。若自行配置远程接口，字幕内容会发送至该接口，
@@ -240,6 +291,13 @@ docker logs -f netflix-translator
 - 在 `edge://extensions` 重新加载扩展，然后刷新 Netflix 页面。
 - Netflix 改版后字幕 DOM 可能变化，需要更新 `content.js` 中的选择器。
 
+### Ollama 返回连接失败
+
+- 确认 Ollama 应用正在运行。
+- 运行 `ollama list`，确认存在 `qwen3:4b-instruct`。
+- 打开 `http://127.0.0.1:11434`，正常应显示 Ollama 正在运行。
+- 确认扩展设置中的接口是 `http://127.0.0.1:11434/api/chat`。
+
 ### 使用自定义远程服务器
 
 需要把远程域名加入 `manifest.json` 的 `host_permissions`，然后在
@@ -249,8 +307,8 @@ docker logs -f netflix-translator
 
 ```text
 manifest.json      Edge 扩展清单
-background.js      翻译 API 请求
-content.js         字幕检测、缓存和译文叠加
+background.js      LibreTranslate/Ollama API 请求与提示词
+content.js         字幕检测、上下文、缓存和译文叠加
 content.css        视频字幕样式
 popup.*            扩展开关
 options.*          接口、语言和字号设置

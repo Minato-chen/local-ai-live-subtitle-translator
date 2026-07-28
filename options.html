@@ -9,13 +9,35 @@
 <body>
   <main>
     <h1>Netflix 实时中文字幕</h1>
-    <p class="hint">推荐使用本机 LibreTranslate。字幕只会发送到你填写的翻译地址。</p>
-    <label>LibreTranslate 接口地址
-      <input id="endpoint" type="url" placeholder="http://127.0.0.1:5000/translate">
+    <p class="hint">选择轻量快速翻译，或使用带上下文的本机 AI 高质量翻译。</p>
+    <label>翻译方式
+      <select id="provider">
+        <option value="libretranslate">LibreTranslate（快速、占用低）</option>
+        <option value="ollama">Ollama 本地 AI（质量更高、支持上下文）</option>
+      </select>
     </label>
-    <label>API Key（本机服务通常留空）
-      <input id="apiKey" type="password" autocomplete="off">
-    </label>
+    <div id="libreSettings" class="provider-settings">
+      <label>LibreTranslate 接口地址
+        <input id="endpoint" type="url" placeholder="http://127.0.0.1:5001/translate">
+      </label>
+      <label>API Key（本机服务通常留空）
+        <input id="apiKey" type="password" autocomplete="off">
+      </label>
+    </div>
+    <div id="ollamaSettings" class="provider-settings">
+      <label>Ollama 接口地址
+        <input id="ollamaEndpoint" type="url" placeholder="http://127.0.0.1:11434/api/chat">
+      </label>
+      <div class="row two">
+        <label>模型
+          <input id="ollamaModel" value="qwen3:4b-instruct">
+        </label>
+        <label>参考前文条数
+          <input id="contextLines" type="number" min="0" max="8">
+        </label>
+      </div>
+      <p class="hint">M1 16GB 推荐 qwen3:4b-instruct；首次使用前运行 <code class="inline">ollama pull qwen3:4b-instruct</code>。</p>
+    </div>
     <div class="row">
       <label>源语言<input id="source" value="en"></label>
       <label>目标语言<input id="target" value="zh"></label>
@@ -26,8 +48,10 @@
     <span id="status"></span>
     <section>
       <h2>本机启动 LibreTranslate</h2>
-      <code>docker run -ti --rm -p 5000:5000 libretranslate/libretranslate</code>
-      <p class="hint">首次启动会下载语言模型。启动后，在 Netflix 播放器中选择英文字幕即可。</p>
+      <code>docker start netflix-translator</code>
+      <h2>本机启动 Ollama</h2>
+      <code>ollama pull qwen3:4b-instruct</code>
+      <p class="hint">Ollama 应用运行时会在本机 11434 端口提供接口，不需要 Docker。</p>
     </section>
   </main>
   <script src="options.js"></script>

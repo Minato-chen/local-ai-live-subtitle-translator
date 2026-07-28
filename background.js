@@ -1,36 +1,97 @@
 const DEFAULTS = {
-  endpoint: "http://127.0.0.1:5000/translate",
+  provider: "libretranslate",
+  endpoint: "http://127.0.0.1:5001/translate",
   apiKey: "",
+  ollamaEndpoint: "http://127.0.0.1:11434/api/chat",
+  ollamaModel: "qwen3:4b-instruct",
   source: "en",
   target: "zh",
-  timeoutMs: 8000
+  timeoutMs: 30000
 };
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== "TRANSLATE") return false;
 
-  translate(message.text)
+  translate(message.text, message.context || [])
     .then((translatedText) => sendResponse({ ok: true, translatedText }))
     .catch((error) => sendResponse({ ok: false, error: error.message }));
 
   return true;
 });
 
-async function translate(text) {
+async function translate(text, context) {
   const settings = await chrome.storage.sync.get(DEFAULTS);
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), settings.timeoutMs);
+  if (settings.provider === "ollama") {
+    return translateWithOllama(text, context, settings);
+  }
+  return translateWithLibreTranslate(text, settings);
+}
 
-  const payload = {
+async function translateWithLibreTranslate(text, settings) {
+  return fetchWithTimeout(settings.endpoint, settings.timeoutMs, {
     q: text,
     source: settings.source,
     target: settings.target,
-    format: "text"
+    format: "text",
+    ...(settings.apiKey ? { api_key: settings.apiKey } : {})
+  }, (data) => {
+    if (!data.translatedText) throw new Error("翻译服务没有返回 translatedText");
+    return data.translatedText;
+  });
+}
+
+async function translateWithOllama(text, context, settings) {
+  const languageNames = {
+    en: "英语",
+    zh: "简体中文",
+    ja: "日语",
+    ko: "韩语",
+    fr: "法语",
+    de: "德语",
+    es: "西班牙语"
   };
-  if (settings.apiKey) payload.api_key = settings.apiKey;
+  const sourceName = languageNames[settings.source] || settings.source;
+  const targetName = languageNames[settings.target] || settings.target;
+  const contextText = context.length
+    ? `前文字幕（仅供理解语境，不要翻译或输出）：\n${context.map((line) => `- ${line}`).join("\n")}\n\n`
+    : "";
+
+  const payload = {
+    model: settings.ollamaModel,
+    stream: false,
+    keep_alive: "30m",
+    messages: [
+      {
+        role: "system",
+        content: `你是专业影视字幕翻译。把${sourceName}自然、准确、简洁地翻译成${targetName}。保留语气、称谓和人物关系，不添加解释，不输出原文，只输出一行译文。`
+      },
+      {
+        role: "user",
+        content: `${contextText}当前字幕：\n${text}`
+      }
+    ],
+    options: {
+      temperature: 0.1,
+      num_predict: 120
+    }
+  };
+
+  return fetchWithTimeout(settings.ollamaEndpoint, settings.timeoutMs, payload, (data) => {
+    const translatedText = data?.message?.content
+      ?.replace(/<think>[\s\S]*?<\/think>/gi, "")
+      .replace(/^```[\w-]*\s*|\s*```$/g, "")
+      .trim();
+    if (!translatedText) throw new Error("Ollama 没有返回译文");
+    return translatedText;
+  });
+}
+
+async function fetchWithTimeout(url, timeoutMs, payload, parseResponse) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Number(timeoutMs) || 30000);
 
   try {
-    const response = await fetch(settings.endpoint, {
+    const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -42,8 +103,7 @@ async function translate(text) {
     }
 
     const data = await response.json();
-    if (!data.translatedText) throw new Error("翻译服务没有返回 translatedText");
-    return data.translatedText;
+    return parseResponse(data);
   } catch (error) {
     if (error.name === "AbortError") throw new Error("翻译请求超时");
     throw error;
