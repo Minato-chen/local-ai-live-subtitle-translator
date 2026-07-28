@@ -4,6 +4,18 @@
 播放器当前显示的字幕，通过本机运行的 LibreTranslate 或 Ollama 翻译，并把中文
 译文实时叠加在视频画面上。
 
+## 目录
+
+- [功能](#功能)
+- [选择翻译方式](#选择翻译方式)
+- [快速开始](#快速开始)
+- [方案一：LibreTranslate 快速模式](#方案一libretranslate-快速模式)
+- [方案二：Ollama 高质量模式](#方案二ollama-高质量模式)
+- [结束观看后释放后台资源](#结束观看后释放后台资源)
+- [语言切换](#语言切换)
+- [常见问题](#常见问题)
+- [隐私与实现原理](#隐私)
+
 ## 功能
 
 - 支持 Netflix 英语、日语等字幕实时翻译为中文
@@ -16,14 +28,18 @@
 - 支持调整字号、源语言、目标语言和上下文数量
 - 默认情况下字幕只在本机处理
 
-## 翻译方式
+## 选择翻译方式
 
-| 模式 | 适合场景 | 优点 | 局限 |
-| --- | --- | --- | --- |
-| LibreTranslate | 低配置电脑、追求低延迟 | 启动快、资源占用低 | 逐句翻译，日语口语和语境质量一般 |
-| Ollama | 日语影视、追求自然译文 | 可参考前文，译文更自然 | 模型越大速度越慢，占用更多内存 |
+| 模式 | 需要 Ollama | 需要 Docker | 适合场景 | 局限 |
+| --- | --- | --- | --- | --- |
+| Ollama（默认） | 是 | **否** | Hy-MT2 自动识别语言，译文自然 | 占用模型内存 |
+| LibreTranslate | 否 | 是 | 低配置电脑、追求低延迟 | 日语口语和语境质量一般 |
 
-两种服务不需要同时运行。在扩展设置中选择哪一种，只需启动对应服务。
+两种服务完全独立，不需要同时运行：
+
+- 使用 Ollama 时不需要安装或启动 Docker。
+- 使用 LibreTranslate 时不需要安装或启动 Ollama。
+- 默认 Hy-MT2 配置只需要 Ollama；Docker Desktop 可以退出。
 
 默认配置：
 
@@ -51,66 +67,6 @@
 
 修改扩展代码或更新版本后，需要在 `edge://extensions` 点击“重新加载”，并刷新
 Netflix 页面。
-
-## 结束观看后释放后台资源
-
-关闭 Netflix 标签页只会停止新的翻译请求。扩展会要求 Ollama 将模型保留在内存中
-最多 30 分钟，以便连续字幕快速响应；如果希望立即释放内存，需要手动停止模型。
-
-### 使用 Ollama 时
-
-只卸载当前模型、立即释放模型占用的内存：
-
-```text
-ollama stop maternion/hy-mt2:1.8b
-```
-
-确认没有模型仍在运行：
-
-```text
-ollama ps
-```
-
-这种方式会保留轻量的 Ollama 后台服务，下次观看时无需重新启动应用，扩展会自动
-重新加载模型。
-
-如果希望完全退出 Ollama：
-
-- macOS：点击菜单栏的 Ollama 图标，选择 `Quit Ollama`。
-- Windows：右键系统托盘中的 Ollama 图标，选择 `Quit`。
-- 如果是在终端运行 `ollama serve`，回到该终端按 `Control + C`。
-
-下次使用时，从“应用程序”或 Windows“开始”菜单重新打开 Ollama。停止或退出不会
-删除已下载模型。
-
-### 使用 LibreTranslate 时
-
-停止翻译容器：
-
-```text
-docker stop netflix-translator
-```
-
-下次使用：
-
-```text
-docker start netflix-translator
-```
-
-停止容器不会删除容器或语言模型。如果没有其他容器需要运行，还可以从菜单栏或系统
-托盘退出 Docker Desktop，进一步释放内存。不要运行 `docker rm`，除非确定要删除
-容器并重新创建。
-
-### 最推荐的日常操作
-
-默认 Hy-MT2 模式看完后只需运行：
-
-```text
-ollama stop maternion/hy-mt2:1.8b
-```
-
-这样能立即释放大部分相关内存，同时保留 Ollama 服务，下一次打开 Netflix 仍可直接
-使用。
 
 ---
 
@@ -290,7 +246,7 @@ ollama pull maternion/hy-mt2:1.8b
 2. 下载实时模型：
 
 ```bash
-ollama pull qwen3:1.7b
+ollama pull maternion/hy-mt2:1.8b
 ```
 
 3. 允许 Edge 扩展访问本机 Ollama：
@@ -320,7 +276,7 @@ launchctl getenv OLLAMA_ORIGINS
 2. 打开 PowerShell，下载实时模型：
 
 ```powershell
-ollama pull qwen3:1.7b
+ollama pull maternion/hy-mt2:1.8b
 ```
 
 3. 为当前 Windows 用户添加扩展来源环境变量：
@@ -357,7 +313,7 @@ macOS：
 curl http://127.0.0.1:11434/api/chat \
   -H "Content-Type: application/json" \
   -d '{
-    "model":"qwen3:1.7b",
+    "model":"maternion/hy-mt2:1.8b",
     "think":false,
     "stream":false,
     "messages":[{"role":"user","content":"把「お疲れ様でした」翻译成中文，只输出译文"}]
@@ -368,7 +324,7 @@ Windows PowerShell：
 
 ```powershell
 $body = @{
-  model = "qwen3:1.7b"
+  model = "maternion/hy-mt2:1.8b"
   think = $false
   stream = $false
   messages = @(@{
@@ -385,8 +341,10 @@ Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/chat" -Method Post -ContentTy
 ```text
 翻译方式：Ollama 本地 AI
 接口地址：http://127.0.0.1:11434/api/chat
-模型：qwen3:1.7b
+模型：maternion/hy-mt2:1.8b
 参考前文条数：1
+源语言：auto
+目标语言：zh
 ```
 
 使用 `qwen3:4b-instruct` 时可把前文条数设为 `3`，但实时性会下降。
@@ -399,6 +357,69 @@ ollama rm qwen3:4b-instruct
 ```
 
 Ollama 必须保持运行；选择 Ollama 模式时不需要启动 LibreTranslate Docker 容器。
+
+---
+
+## 结束观看后释放后台资源
+
+关闭 Netflix 标签页只会停止新的翻译请求。扩展会要求 Ollama 将模型保留在内存中
+最多 30 分钟，以便连续字幕快速响应；如果希望立即释放内存，需要手动停止模型。
+
+### 使用 Ollama 时
+
+只卸载默认 Hy-MT2 模型、立即释放模型占用的内存：
+
+```text
+ollama stop maternion/hy-mt2:1.8b
+```
+
+确认没有模型仍在运行：
+
+```text
+ollama ps
+```
+
+这种方式会保留轻量的 Ollama 后台服务，下次观看时无需重新启动应用，扩展会自动
+重新加载模型。使用 Ollama 时不需要 Docker，LibreTranslate 容器和 Docker Desktop
+都可以保持关闭。
+
+如果希望完全退出 Ollama：
+
+- macOS：点击菜单栏的 Ollama 图标，选择 `Quit Ollama`。
+- Windows：右键系统托盘中的 Ollama 图标，选择 `Quit`。
+- 如果是在终端运行 `ollama serve`，回到该终端按 `Control + C`。
+
+下次使用时，从“应用程序”或 Windows“开始”菜单重新打开 Ollama。停止或退出不会
+删除已下载模型。
+
+### 使用 LibreTranslate 时
+
+停止翻译容器：
+
+```text
+docker stop netflix-translator
+```
+
+下次使用：
+
+```text
+docker start netflix-translator
+```
+
+停止容器不会删除容器或语言模型。如果没有其他容器需要运行，还可以从菜单栏或系统
+托盘退出 Docker Desktop，进一步释放内存。不要运行 `docker rm`，除非确定要删除
+容器并重新创建。
+
+### 最推荐的日常操作
+
+默认 Hy-MT2 模式看完后只需运行：
+
+```text
+ollama stop maternion/hy-mt2:1.8b
+```
+
+这样能立即释放大部分相关内存，同时保留 Ollama 服务，下一次打开 Netflix 仍可直接
+使用。
 
 ---
 
@@ -474,7 +495,7 @@ Ollama：
 
 - Ollama 接口必须是 `http://127.0.0.1:11434/api/chat`。
 - 运行 `ollama list`，确认扩展中填写的模型名称确实存在。
-- 缺少模型时运行 `ollama pull qwen3:1.7b`。
+- 缺少默认模型时运行 `ollama pull maternion/hy-mt2:1.8b`。
 
 ### `Failed to fetch`
 
@@ -502,7 +523,7 @@ docker logs -f netflix-translator
 
 模型速度赶不上字幕切换。建议：
 
-- 使用 `qwen3:1.7b`。
+- 使用默认的 `maternion/hy-mt2:1.8b`。
 - 把“参考前文条数”设为 `1`。
 - 运行 `ollama ps` 检查模型是否使用 GPU。
 - 关闭其他占用大量内存的应用。
