@@ -1,10 +1,10 @@
 const DEFAULTS = {
-  provider: "libretranslate",
+  provider: "ollama",
   endpoint: "http://127.0.0.1:5001/translate",
   apiKey: "",
   ollamaEndpoint: "http://127.0.0.1:11434/api/chat",
-  ollamaModel: "qwen3:4b-instruct",
-  source: "en",
+  ollamaModel: "maternion/hy-mt2:1.8b",
+  source: "auto",
   target: "zh",
   timeoutMs: 30000
 };

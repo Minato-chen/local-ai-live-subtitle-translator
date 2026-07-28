@@ -3,11 +3,11 @@ const DEFAULTS = {
   bilingual: false,
   fontSize: 28,
   delayMs: 180,
-  provider: "libretranslate",
-  source: "en",
+  provider: "ollama",
+  source: "auto",
   target: "zh",
-  ollamaModel: "qwen3:4b-instruct",
-  contextLines: 3
+  ollamaModel: "maternion/hy-mt2:1.8b",
+  contextLines: 1
 };
 
 const cache = new Map();
