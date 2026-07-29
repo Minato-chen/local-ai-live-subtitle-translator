@@ -10,13 +10,21 @@ const DEFAULTS = {
 };
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== "TRANSLATE") return false;
+  if (message?.type === "TRANSLATE") {
+    translate(message.text, message.context || [])
+      .then((translatedText) => sendResponse({ ok: true, translatedText }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
 
-  translate(message.text, message.context || [])
-    .then((translatedText) => sendResponse({ ok: true, translatedText }))
-    .catch((error) => sendResponse({ ok: false, error: error.message }));
+  if (message?.type === "WARM_UP") {
+    warmUpOllama()
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
 
-  return true;
+  return false;
 });
 
 async function translate(text, context) {
@@ -25,6 +33,23 @@ async function translate(text, context) {
     return translateWithOllama(text, context, settings);
   }
   return translateWithLibreTranslate(text, settings);
+}
+
+async function warmUpOllama() {
+  const settings = await chrome.storage.sync.get(DEFAULTS);
+  if (settings.provider !== "ollama") return;
+
+  const endpoint = new URL(settings.ollamaEndpoint);
+  endpoint.pathname = "/api/generate";
+  endpoint.search = "";
+  endpoint.hash = "";
+
+  await fetchWithTimeout(endpoint.toString(), settings.timeoutMs, {
+    model: settings.ollamaModel,
+    prompt: "",
+    stream: false,
+    keep_alive: "30m"
+  }, () => true);
 }
 
 async function translateWithLibreTranslate(text, settings) {

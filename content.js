@@ -16,6 +16,7 @@ let settings = { ...DEFAULTS };
 let lastSource = "";
 let requestVersion = 0;
 let debounceTimer;
+let warmedWatchId = "";
 let overlay;
 let translatedLine;
 let sourceLine;
@@ -30,7 +31,9 @@ async function init() {
     for (const [key, value] of Object.entries(changes)) settings[key] = value.newValue;
     cache.clear();
     subtitleHistory.length = 0;
+    warmedWatchId = "";
     applySettings();
+    maybeWarmUp();
     scanSubtitles();
   });
 
@@ -89,6 +92,7 @@ function readSubtitle(container) {
 }
 
 function scanSubtitles() {
+  maybeWarmUp();
   if (!settings.enabled || !overlay) return;
   const container = findSubtitleContainer();
   if (!container) {
@@ -110,6 +114,17 @@ function scanSubtitles() {
   debounceTimer = setTimeout(() => requestTranslation(text, context), settings.delayMs);
 }
 
+function maybeWarmUp() {
+  if (settings.provider !== "ollama" || !document.querySelector("video")) return;
+  const watchId = location.pathname.match(/^\/watch\/(\d+)/)?.[1];
+  if (!watchId || watchId === warmedWatchId) return;
+
+  const runtime = globalThis.chrome?.runtime;
+  if (!runtime?.sendMessage) return;
+  warmedWatchId = watchId;
+  runtime.sendMessage({ type: "WARM_UP" }).catch(() => {});
+}
+
 async function requestTranslation(text, context) {
   const version = ++requestVersion;
   const cacheKey = settings.provider === "ollama"
@@ -120,7 +135,7 @@ async function requestTranslation(text, context) {
     return;
   }
 
-  translatedLine.textContent = "翻译中…";
+  translatedLine.textContent = "...";
   try {
     const runtime = globalThis.chrome?.runtime;
     if (!runtime?.sendMessage) {
