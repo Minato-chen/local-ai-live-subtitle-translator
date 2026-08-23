@@ -174,6 +174,14 @@ Ollama 接口：http://127.0.0.1:11434/api/chat
 
 保存后，打开 `edge://extensions` 点击扩展的“重新加载”，再刷新 Netflix 页面。
 
+接口地址不是模型名称。默认地址由服务器地址和 API 路径组成：
+
+```text
+服务器：http://127.0.0.1:11434
+聊天接口：/api/chat
+扩展填写：http://127.0.0.1:11434/api/chat
+```
+
 ### 第六步：观看 Netflix
 
 1. 打开 Netflix 并播放视频。
@@ -371,7 +379,10 @@ Desktop。
 
 ### HTTP 403
 
-Ollama 默认会拒绝浏览器扩展来源。确认已设置：
+如果终端直接调用 `/api/chat` 能正常返回，但 Netflix 翻译显示 HTTP 403，说明模型和
+接口地址通常没有问题，而是 Ollama 拒绝了 Edge 扩展的 `chrome-extension://` 来源。
+
+确认已设置：
 
 macOS：
 
@@ -385,7 +396,28 @@ Windows PowerShell：
 [Environment]::SetEnvironmentVariable("OLLAMA_ORIGINS", "chrome-extension://*", "User")
 ```
 
-设置后必须完全退出并重新启动 Ollama。
+设置后必须：
+
+1. 从菜单栏或系统托盘完全退出 Ollama，不能只关闭窗口。
+2. 重新打开 Ollama。
+3. 在 `edge://extensions` 中重新加载本扩展。
+4. 刷新 Netflix 播放页面。
+
+macOS 可运行以下命令确认变量已经设置：
+
+```bash
+launchctl getenv OLLAMA_ORIGINS
+```
+
+应输出 `chrome-extension://*`。如果仍然返回 403，可先完全退出 Ollama，再用下面的
+命令临时启动并验证：
+
+```bash
+OLLAMA_ORIGINS="chrome-extension://*" ollama serve
+```
+
+保持终端运行并刷新 Netflix。若此时恢复翻译，说明之前运行的 Ollama 没有读取到环境
+变量，并非接口或模型故障。
 
 ### HTTP 404
 
