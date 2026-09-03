@@ -29,6 +29,7 @@ select {
   margin-top: 7px;
   padding: 9px;
 }
+#uiLanguage { width: auto; min-width: 110px; margin-top: 4px; }
 input[type="color"] {
   display: block;
   box-sizing: border-box;
