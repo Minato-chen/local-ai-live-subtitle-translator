@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "实时字幕翻译",
+  "name": "本地 AI 实时字幕翻译",
   "version": "1.5.0",
   "description": "读取 Netflix 和 YouTube 字幕，通过兼容 OpenAI API 的本地翻译服务实时显示中文翻译。",
   "icons": {
@@ -29,7 +29,7 @@
   ],
   "options_page": "options.html",
   "action": {
-    "default_title": "实时字幕翻译",
+    "default_title": "本地 AI 实时字幕翻译",
     "default_icon": {
       "16": "icons/icon-idle-16.png",
       "32": "icons/icon-idle-32.png",
