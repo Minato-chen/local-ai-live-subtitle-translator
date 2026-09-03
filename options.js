@@ -17,6 +17,7 @@ const DEFAULTS = {
 const ids = Object.keys(DEFAULTS);
 
 document.addEventListener("DOMContentLoaded", async () => {
+  await initI18n();
   const settings = await chrome.storage.sync.get(DEFAULTS);
   for (const id of ids) {
     const element = document.getElementById(id);

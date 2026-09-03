@@ -9,6 +9,7 @@
 <body>
   <main>
     <h1>本地 AI 实时字幕翻译</h1>
+    <label>语言 / Language<select id="uiLanguage"><option value="zh">中文</option><option value="en">English</option></select></label>
     <p class="hint">将 Netflix 或 YouTube 字幕发送到你选择的翻译服务；默认推荐本机 llama.cpp + Hy-MT2。</p>
     <section>
       <h2>启动本地翻译服务</h2>
@@ -55,6 +56,6 @@
     <button id="save">保存设置</button>
     <span id="status"></span>
   </main>
-  <script src="options.js"></script>
+  <script src="i18n.js"></script><script src="options.js"></script>
 </body>
 </html>

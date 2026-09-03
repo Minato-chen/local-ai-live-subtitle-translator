@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", async () => {
+  await initI18n();
   const { enabled = true } = await chrome.storage.sync.get({ enabled: true });
   document.getElementById("enabled").checked = enabled;
 });
