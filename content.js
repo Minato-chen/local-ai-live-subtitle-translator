@@ -31,7 +31,14 @@ let translatedLine;
 let sourceLine;
 let statusLine;
 
-init();
+if (isTranslationPage()) init();
+
+function isTranslationPage() {
+  const host = location.hostname;
+  if (host === "www.netflix.com") return /^\/watch\/\d+/.test(location.pathname);
+  if (host === "www.youtube.com") return location.pathname === "/watch" || location.pathname.startsWith("/shorts/");
+  return false;
+}
 
 async function init() {
   settings = await chrome.storage.sync.get(DEFAULTS);
@@ -215,10 +222,14 @@ function positionOverlay(container = findSubtitleContainer()) {
   // YouTube's outer caption container covers the whole player. Anchor to the
   // visible caption window instead, otherwise the translation is placed near
   // the top of the viewport.
-  const anchor = container.matches(".ytp-caption-window-container")
-    ? [...container.querySelectorAll(".caption-window")].filter((node) => node.textContent.trim()).at(-1) || container
-    : container;
+  const captionWindow = container.matches(".ytp-caption-window-container")
+    ? [...container.querySelectorAll(".caption-window")]
+      .filter((node) => node.textContent.trim() && node.getBoundingClientRect().height > 0)
+      .at(-1)
+    : null;
+  const anchor = captionWindow || container;
   const rect = anchor.getBoundingClientRect();
+  const isYoutubeOuterContainer = anchor === container && container.matches(".ytp-caption-window-container");
   overlay.style.top = "";
   overlay.style.bottom = "";
   if (settings.position === "below") {
@@ -228,7 +239,10 @@ function positionOverlay(container = findSubtitleContainer()) {
   } else if (settings.position === "bottom") {
     overlay.style.bottom = `${Math.max(8, window.innerHeight * 0.1)}px`;
   } else {
-    overlay.style.bottom = `${Math.max(40, window.innerHeight - rect.top + 8)}px`;
+    const bottomGap = isYoutubeOuterContainer
+      ? window.innerHeight - rect.bottom + 48
+      : window.innerHeight - rect.top + 8;
+    overlay.style.bottom = `${Math.max(40, bottomGap)}px`;
   }
   if (settings.position === "top" || settings.position === "bottom") {
     requestAnimationFrame(() => {

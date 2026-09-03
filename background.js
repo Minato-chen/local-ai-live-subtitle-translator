@@ -14,8 +14,9 @@ const ICONS = {
 
 function isSupportedPage(url) {
   try {
-    const host = new URL(url).hostname;
-    return host === "www.netflix.com" || host === "www.youtube.com";
+    const { hostname, pathname } = new URL(url);
+    if (hostname === "www.netflix.com") return /^\/watch\/\d+/.test(pathname);
+    return hostname === "www.youtube.com" && (pathname === "/watch" || pathname.startsWith("/shorts/"));
   } catch {
     return false;
   }
@@ -78,19 +79,16 @@ async function translateWithLlamaCpp(text, context, settings, signal) {
     : "";
   const model = await discoverModel(settings.serviceUrl);
 
-  const requestTranslation = (strict = false) => {
-    const strictInstruction = strict
-      ? `上一次输出未完成翻译。最终答案必须完全使用${targetName}，不得重复原文。`
-      : "";
+  const requestTranslation = () => {
     return fetchWithTimeout(serviceEndpoint(settings.serviceUrl, "/v1/chat/completions"), settings.timeoutMs, {
       model,
       stream: false,
-      temperature: strict ? 0 : 0.1,
+      temperature: 0.1,
       max_tokens: 48,
       messages: [
         {
           role: "system",
-          content: `你是专业影视字幕翻译。${settings.source === "auto" ? "自动识别输入语言并" : `把${sourceName}`}自然、准确、简洁地翻译成${targetName}。保留语气、称谓和人物关系，不添加解释，不输出原文，只输出一行译文。${strictInstruction}`
+          content: `你是专业影视字幕翻译。${settings.source === "auto" ? "自动识别输入语言并" : `把${sourceName}`}自然、准确、简洁地翻译成${targetName}。保留语气、称谓和人物关系，不添加解释，不输出原文，只输出一行译文。`
         },
         {
           role: "user",
@@ -100,11 +98,7 @@ async function translateWithLlamaCpp(text, context, settings, signal) {
     }, cleanOpenAiResponse, signal);
   };
 
-  let translatedText = await requestTranslation();
-  if (shouldRetryUntranslated(text, translatedText, settings)) {
-    translatedText = await requestTranslation(true);
-  }
-  return translatedText;
+  return requestTranslation();
 }
 
 function serviceEndpoint(serviceUrl, path) {
@@ -157,21 +151,6 @@ function cleanOpenAiResponse(data) {
     .trim();
   if (!translatedText) throw new Error("llama.cpp 没有返回译文");
   return translatedText;
-}
-
-function shouldRetryUntranslated(sourceText, translatedText, settings) {
-  const containsKana = /[\u3040-\u30ff]/.test(translatedText);
-  const normalize = (value) => value.replace(/[\s。、！？!?…，,.「」『』"'“”]/g, "");
-  const repeatedSource = normalize(sourceText) === normalize(translatedText);
-  const japaneseSource = settings.source === "ja"
-    || (settings.source === "auto" && /[\u3040-\u30ff]/.test(sourceText));
-  if (japaneseSource && settings.target === "zh" && containsKana) return true;
-  if (!repeatedSource || settings.source === settings.target) return false;
-  // With auto detection, an unchanged Chinese subtitle is already a valid zh result.
-  if (settings.source === "auto" && settings.target === "zh" && /[\u4e00-\u9fff]/.test(sourceText) && !/[\u3040-\u30ff]/.test(sourceText)) {
-    return false;
-  }
-  return true;
 }
 
 async function fetchWithTimeout(url, timeoutMs, payload, parseResponse, signal) {
