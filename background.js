@@ -1,12 +1,12 @@
 const DEFAULTS = {
   source: "auto",
   target: "zh",
-  timeoutMs: 12000
+  timeoutMs: 12000,
+  serviceUrl: "http://127.0.0.1:8080"
 };
 
-const LLAMA_CPP_ENDPOINT = "http://127.0.0.1:8080/v1/chat/completions";
-const HY_MT2_MODEL = "hy-mt2-fast";
 const activeTranslations = new Map();
+const modelCache = new Map();
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "TRANSLATE") {
@@ -27,6 +27,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 
+  if (message?.type === "CHECK_SERVICE") {
+    checkService(message.serviceUrl)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
   return false;
 });
 
@@ -45,13 +52,13 @@ async function translateWithLlamaCpp(text, context, settings, signal) {
   const contextText = context.length
     ? `前文字幕（仅供理解语境，不要翻译或输出）：\n${context.map((line) => `- ${line}`).join("\n")}\n\n`
     : "";
-  const model = HY_MT2_MODEL;
+  const model = await discoverModel(settings.serviceUrl);
 
   const requestTranslation = (strict = false) => {
     const strictInstruction = strict
-      ? "上一次输出仍含日语。最终答案必须完全使用简体中文，不得包含平假名或片假名。"
+      ? `上一次输出未完成翻译。最终答案必须完全使用${targetName}，不得重复原文。`
       : "";
-    return fetchWithTimeout(LLAMA_CPP_ENDPOINT, settings.timeoutMs, {
+    return fetchWithTimeout(serviceEndpoint(settings.serviceUrl, "/v1/chat/completions"), settings.timeoutMs, {
       model,
       stream: false,
       temperature: strict ? 0 : 0.1,
@@ -70,10 +77,52 @@ async function translateWithLlamaCpp(text, context, settings, signal) {
   };
 
   let translatedText = await requestTranslation();
-  if (shouldRetryJapaneseTranslation(text, translatedText, settings)) {
+  if (shouldRetryUntranslated(text, translatedText, settings)) {
     translatedText = await requestTranslation(true);
   }
   return translatedText;
+}
+
+function serviceEndpoint(serviceUrl, path) {
+  let url;
+  try {
+    url = new URL(serviceUrl || "http://127.0.0.1:8080");
+  } catch {
+    throw new Error("翻译服务地址无效");
+  }
+  if (!/^https?:$/.test(url.protocol)) throw new Error("翻译服务仅支持 HTTP 或 HTTPS 地址");
+  const basePath = url.pathname.replace(/\/$/, "").replace(/\/v1$/, "");
+  return `${url.origin}${basePath}${path}`;
+}
+
+async function discoverModel(serviceUrl) {
+  const endpoint = serviceEndpoint(serviceUrl, "/v1/models");
+  const cached = modelCache.get(endpoint);
+  if (cached) return cached;
+  const modelsResponse = await fetch(endpoint);
+  if (!modelsResponse.ok) throw new Error(`模型列表返回 HTTP ${modelsResponse.status}`);
+  const modelsData = await modelsResponse.json();
+  const model = modelsData?.data?.map((item) => item?.id).find(Boolean);
+  if (!model) throw new Error("服务没有返回可用模型");
+  modelCache.set(endpoint, model);
+  return model;
+}
+
+async function checkService(serviceUrl) {
+  const start = performance.now();
+  const model = await discoverModel(serviceUrl);
+  const translatedText = await fetchWithTimeout(serviceEndpoint(serviceUrl, "/v1/chat/completions"), 12000, {
+    model,
+    stream: false,
+    temperature: 0,
+    max_tokens: 16,
+    messages: [
+      { role: "system", content: "把用户文本翻译成简体中文；只输出译文。" },
+      { role: "user", content: "Hello" }
+    ]
+  }, cleanOpenAiResponse);
+  if (!translatedText) throw new Error("测试翻译没有返回内容");
+  return { latencyMs: Math.round(performance.now() - start) };
 }
 
 function cleanOpenAiResponse(data) {
@@ -86,14 +135,19 @@ function cleanOpenAiResponse(data) {
   return translatedText;
 }
 
-function shouldRetryJapaneseTranslation(sourceText, translatedText, settings) {
-  const japaneseSource = settings.source === "ja"
-    || (settings.source === "auto" && /[\u3040-\u30ff]/.test(sourceText));
-  if (!japaneseSource || settings.target !== "zh") return false;
+function shouldRetryUntranslated(sourceText, translatedText, settings) {
   const containsKana = /[\u3040-\u30ff]/.test(translatedText);
   const normalize = (value) => value.replace(/[\s。、！？!?…，,.「」『』"'“”]/g, "");
   const repeatedSource = normalize(sourceText) === normalize(translatedText);
-  return containsKana || repeatedSource;
+  const japaneseSource = settings.source === "ja"
+    || (settings.source === "auto" && /[\u3040-\u30ff]/.test(sourceText));
+  if (japaneseSource && settings.target === "zh" && containsKana) return true;
+  if (!repeatedSource || settings.source === settings.target) return false;
+  // With auto detection, an unchanged Chinese subtitle is already a valid zh result.
+  if (settings.source === "auto" && settings.target === "zh" && /[\u4e00-\u9fff]/.test(sourceText) && !/[\u3040-\u30ff]/.test(sourceText)) {
+    return false;
+  }
+  return true;
 }
 
 async function fetchWithTimeout(url, timeoutMs, payload, parseResponse, signal) {

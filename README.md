@@ -1,6 +1,6 @@
-# Netflix 实时中文字幕
+# Netflix / YouTube 实时中文字幕
 
-Edge 扩展：读取 Netflix 当前字幕，通过本机 `llama.cpp + Hy-MT2 Q4_K_M` 显示中文字幕。
+Edge/Chrome 扩展：读取 Netflix 或 YouTube 当前字幕，通过本机 `llama.cpp + Hy-MT2 Q4_K_M` 显示中文字幕。
 
 ## 安装
 
@@ -26,21 +26,15 @@ Edge 扩展：读取 Netflix 当前字幕，通过本机 `llama.cpp + Hy-MT2 Q4_
 
 3. 启动本地翻译服务：
 
-   **Windows（PowerShell）**：
+   win（power shell）/mac终端（相同）
 
    ```powershell
    llama serve -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M -ngl all -c 2048 -np 1 -a hy-mt2-fast
    ```
 
-   **macOS（终端）**：
-
-   ```bash
-   llama serve -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M -ngl 99 -c 2048 -np 1 -a hy-mt2-fast
-   ```
-
    只有第一次运行会下载模型。之后只需再次运行上述命令即可。服务窗口需要保持开启。
 
-4. 打开 Netflix 播放页并选择原字幕；中文翻译会自动显示。
+4. 打开 Netflix 或 YouTube 播放页并选择原字幕；中文翻译会自动显示。
 
 ## 设置
 

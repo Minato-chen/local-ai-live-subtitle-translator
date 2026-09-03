@@ -1,19 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Netflix 实时中文字幕",
-  "version": "1.4.0",
-  "description": "读取 Netflix 字幕，通过本机 llama.cpp 与 Hy-MT2 实时显示中文翻译。",
+  "name": "实时字幕翻译",
+  "version": "1.5.0",
+  "description": "读取 Netflix 和 YouTube 字幕，通过兼容 OpenAI API 的本地翻译服务实时显示中文翻译。",
   "permissions": ["storage"],
   "host_permissions": [
     "https://www.netflix.com/*",
-    "http://127.0.0.1/*"
+    "https://www.youtube.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["https://www.netflix.com/*"],
+      "matches": ["https://www.netflix.com/*", "https://www.youtube.com/*"],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
@@ -21,7 +23,7 @@
   ],
   "options_page": "options.html",
   "action": {
-    "default_title": "Netflix 实时中文字幕",
+    "default_title": "实时字幕翻译",
     "default_popup": "popup.html"
   }
 }

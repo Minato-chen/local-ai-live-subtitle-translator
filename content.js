@@ -4,7 +4,8 @@ const DEFAULTS = {
   fontSize: 28,
   source: "auto",
   target: "zh",
-  contextLines: 0
+  contextLines: 0,
+  serviceUrl: "http://127.0.0.1:8080"
 };
 
 const cache = new Map();
@@ -71,6 +72,8 @@ function applySettings() {
 
 function findSubtitleContainer() {
   const selectors = [
+    ".ytp-caption-window-container",
+    ".ytp-caption-segment",
     ".player-timedtext-text-container",
     "[data-uia='player-subtitle-text']",
     ".watch-video--timed-text"
@@ -112,7 +115,7 @@ function scanSubtitles() {
   if (subtitleHistory.length > 20) subtitleHistory.shift();
 
   clearTimeout(debounceTimer);
-  // Netflix often rebuilds the same subtitle node several times in one frame.
+  // Video players often rebuild the same subtitle node several times in one frame.
   // A tiny fixed window avoids cancelling a nearly finished translation while
   // remaining imperceptible to the viewer.  Do not use the legacy delayMs
   // value: it was never exposed in settings and may be stale in sync storage.
@@ -148,7 +151,7 @@ async function requestTranslation(text, context, version) {
 }
 
 async function translateOne(text, context, version, requestId) {
-  const cacheKey = JSON.stringify([settings.source, settings.target, context, text]);
+  const cacheKey = JSON.stringify([settings.serviceUrl, settings.source, settings.target, context, text]);
   if (cache.has(cacheKey)) {
     showTranslation(cache.get(cacheKey), version);
     return;
@@ -186,7 +189,13 @@ function showTranslation(text, version) {
 
 function positionOverlay(container = findSubtitleContainer()) {
   if (!container || !overlay) return;
-  const rect = container.getBoundingClientRect();
+  // YouTube's outer caption container covers the whole player. Anchor to the
+  // visible caption window instead, otherwise the translation is placed near
+  // the top of the viewport.
+  const anchor = container.matches(".ytp-caption-window-container")
+    ? [...container.querySelectorAll(".caption-window")].filter((node) => node.textContent.trim()).at(-1) || container
+    : container;
+  const rect = anchor.getBoundingClientRect();
   const bottomGap = Math.max(40, window.innerHeight - rect.top + 8);
   overlay.style.bottom = `${bottomGap}px`;
 }
