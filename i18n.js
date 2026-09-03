@@ -10,6 +10,13 @@ const I18N = {
   }
 };
 
+Object.assign(I18N.en, {
+  "源语言": "Source language",
+  "目标语言": "Target language",
+  "位置": "Position",
+  "可修改端口，但服务必须运行在本机，并提供 OpenAI 兼容接口。": "You may change the port, but the service must run locally and provide an OpenAI-compatible API."
+});
+
 async function initI18n() {
   const { uiLanguage = "zh" } = await chrome.storage.sync.get({ uiLanguage: "zh" });
   const select = document.getElementById("uiLanguage");
