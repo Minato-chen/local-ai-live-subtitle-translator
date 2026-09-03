@@ -219,6 +219,17 @@ function showTranslation(text, version) {
 
 function positionOverlay(container = findSubtitleContainer()) {
   if (!container || !overlay) return;
+  const youtubePlayer = location.hostname === "www.youtube.com"
+    ? document.querySelector(".html5-video-player")
+    : null;
+  if (youtubePlayer) {
+    positionYouTubeOverlay(youtubePlayer);
+    return;
+  }
+  overlay.style.left = "";
+  overlay.style.right = "";
+  overlay.style.maxWidth = "";
+  overlay.style.setProperty("--nf-zh-font-size", `${Number(settings.fontSize) || 28}px`);
   // YouTube's outer caption container covers the whole player. Anchor to the
   // visible caption window instead, otherwise the translation is placed near
   // the top of the viewport.
@@ -257,6 +268,48 @@ function positionOverlay(container = findSubtitleContainer()) {
         : `${Math.max(8, window.innerHeight - rect.bottom - overlayRect.height - 8)}px`;
     });
   }
+}
+
+function positionYouTubeOverlay(player) {
+  const rect = player.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const padding = Math.max(8, Math.min(20, Math.round(rect.width * 0.02)));
+  const compact = rect.width < 560 || rect.height < 300;
+  const requestedSize = Number(settings.fontSize) || 28;
+  const fontSize = compact
+    ? Math.max(16, Math.min(requestedSize, Math.round(rect.width / 24)))
+    : requestedSize;
+
+  // Bind the overlay to the video, not to the whole browser window. This is
+  // essential for YouTube's mini and narrow player layouts.
+  overlay.style.left = `${Math.max(0, rect.left + padding)}px`;
+  overlay.style.right = `${Math.max(0, viewportWidth - rect.right + padding)}px`;
+  overlay.style.maxWidth = `${Math.max(120, rect.width - padding * 2)}px`;
+  overlay.style.setProperty("--nf-zh-font-size", `${fontSize}px`);
+  overlay.style.top = "";
+  overlay.style.bottom = "";
+
+  if (settings.position === "top" || (settings.position === "above" && compact)) {
+    // A small player has no reliable free lane above YouTube's captions.
+    overlay.style.top = `${Math.max(8, rect.top + padding)}px`;
+    return;
+  }
+  if (settings.position === "below") {
+    overlay.style.top = `${Math.min(viewportHeight - 40, rect.bottom + padding)}px`;
+    return;
+  }
+  if (settings.position === "bottom") {
+    overlay.style.bottom = `${Math.max(8, viewportHeight - rect.bottom + padding)}px`;
+    return;
+  }
+
+  // Normal "above" placement: reserve a lane above the native captions at
+  // the bottom of the player. The compact case was handled at the top above.
+  const captionLane = Math.max(72, Math.min(128, rect.height * 0.2));
+  overlay.style.bottom = `${Math.max(8, viewportHeight - rect.bottom + captionLane)}px`;
 }
 
 function clearSubtitle() {
