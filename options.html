@@ -10,33 +10,50 @@
   <main>
     <h1>实时字幕翻译</h1>
     <p class="hint">将 Netflix 或 YouTube 字幕发送到你选择的翻译服务；默认推荐本机 llama.cpp + Hy-MT2。</p>
-    <div class="row">
-      <label>源语言<select id="source">
-        <option value="auto">自动识别</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option><option value="zh">简体中文</option><option value="fr">法语</option><option value="de">德语</option><option value="es">西班牙语</option>
-      </select></label>
-      <label>目标语言<select id="target">
-        <option value="zh">简体中文</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option><option value="fr">法语</option><option value="de">德语</option><option value="es">西班牙语</option>
-      </select></label>
-      <label>中文字幕字号<input id="fontSize" type="number" min="16" max="60"></label>
-      <label>参考前文条数<input id="contextLines" type="number" min="0" max="8"></label>
-    </div>
-    <label class="check"><input id="bilingual" type="checkbox"> 在翻译框内显示原字幕（播放器原字幕仍会保留）</label>
+    <section>
+      <h2>启动本地翻译服务</h2>
+      <p class="hint">推荐使用 Hy-MT2；首次运行会下载模型。使用其他模型时，请按模型文档启动兼容服务。</p>
+      <code>llama serve -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M -ngl 99 -c 2048 -np 1 -a hy-mt2-fast</code>
+      <p class="hint">保持服务窗口开启，然后刷新 Netflix 或 YouTube 播放页面。</p>
+    </section>
+    <section>
+      <h2>本地服务连接（可选）</h2>
+      <label>本地服务地址<input id="serviceUrl" type="url" inputmode="url" placeholder="http://127.0.0.1:8080"></label>
+      <div class="actions"><button id="checkService" type="button">检查服务</button><span id="serviceStatus" class="hint" role="status"></span></div>
+      <p class="hint">默认地址为 <code class="inline">http://127.0.0.1:8080</code>。可修改端口，但服务必须运行在本机，并提供 OpenAI 兼容接口。</p>
+    </section>
+    <section>
+      <h2>翻译与字幕设置</h2>
+      <h3>翻译语言</h3>
+      <div class="row">
+        <label>源语言<select id="source"><option value="auto">自动识别</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option><option value="zh">简体中文</option><option value="fr">法语</option><option value="de">德语</option><option value="es">西班牙语</option></select></label>
+        <label>目标语言<select id="target"><option value="zh">简体中文</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option><option value="fr">法语</option><option value="de">德语</option><option value="es">西班牙语</option></select></label>
+      </div>
+      <p class="hint">语言选择只会写入每次请求的翻译提示，不会切换模型。明确源语言通常更稳定，但速度提升有限；“自动识别”适合混合语言字幕。</p>
+      <h3>字幕显示</h3>
+      <div class="row display-row">
+        <label>字号（px）<input id="fontSize" type="number" min="16" max="60"></label>
+        <label>位置<select id="position"><option value="above">原字幕上方</option><option value="below">原字幕下方</option><option value="bottom">播放器底部（自动避让）</option><option value="top">播放器顶部（自动避让）</option></select></label>
+        <label>译文颜色<input id="textColor" type="color"></label>
+        <span></span>
+      </div>
+      <div class="row display-row">
+        <label class="check"><input id="outlineEnabled" type="checkbox"> 文字描边</label>
+        <label>描边粗细（px）<input id="outlineWidth" type="number" min="0" max="6" step="1"></label>
+        <label>描边颜色<input id="outlineColor" type="color"></label>
+        <span></span>
+      </div>
+      <div class="row display-row">
+        <label class="check"><input id="backgroundEnabled" type="checkbox"> 半透明背景</label>
+        <label>背景不透明度（%）<input id="backgroundOpacity" type="number" min="0" max="100" step="5"></label>
+        <label>背景颜色<input id="backgroundColor" type="color"></label>
+        <span></span>
+      </div>
+      <div class="single-setting"><label>前文参考条数<input id="contextLines" type="number" min="0" max="8"></label></div>
+      <p class="hint">默认采用原来的白字黑色半透明背景样式。描边和背景关闭后，对应颜色、粗细或透明度设置会暂时不可编辑；前文条数越多，代词和上下文可能更准确，但请求会略慢，实时优先建议设为 0。</p>
+    </section>
     <button id="save">保存设置</button>
     <span id="status"></span>
-    <section>
-      <h2>本地翻译服务</h2>
-      <p class="hint">支持 llama.cpp、LM Studio、Ollama 的 OpenAI 兼容模式及其他兼容 <code class="inline">/v1/chat/completions</code> 的本地服务。</p>
-      <label>本地服务地址<input id="serviceUrl" type="url" inputmode="url" placeholder="http://127.0.0.1:8080"></label>
-      <div class="actions">
-        <button id="checkService" type="button">检查服务</button>
-        <span id="serviceStatus" class="hint" role="status"></span>
-      </div>
-      <div class="command-card">
-        <h3>推荐配置：Hy-MT2</h3>
-        <code>llama serve -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M -ngl 99 -c 2048 -np 1 -a hy-mt2-fast</code>
-        <p class="hint">首次运行会下载模型。使用其他模型时，请按该模型文档启动 OpenAI 兼容服务，再填写本地地址并点击“检查服务”。</p>
-      </div>
-    </section>
   </main>
   <script src="options.js"></script>
 </body>

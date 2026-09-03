@@ -1,11 +1,18 @@
 const DEFAULTS = {
   enabled: true,
-  bilingual: false,
-  fontSize: 28,
+  fontSize: 26,
   source: "auto",
   target: "zh",
-  contextLines: 0,
-  serviceUrl: "http://127.0.0.1:8080"
+  contextLines: 1,
+  serviceUrl: "http://127.0.0.1:8080",
+  textColor: "#ffffff",
+  outlineEnabled: false,
+  outlineColor: "#000000",
+  outlineWidth: 2,
+  backgroundEnabled: true,
+  backgroundColor: "#000000",
+  backgroundOpacity: 40,
+  position: "above"
 };
 
 const cache = new Map();
@@ -67,7 +74,22 @@ function applySettings() {
   if (!overlay) return;
   overlay.style.setProperty("--nf-zh-font-size", `${Number(settings.fontSize) || 28}px`);
   overlay.classList.toggle("nf-zh-disabled", !settings.enabled);
-  sourceLine.classList.toggle("nf-zh-hidden", !settings.bilingual);
+  sourceLine.classList.add("nf-zh-hidden");
+  translatedLine.style.color = settings.textColor || "#ffffff";
+  translatedLine.style.webkitTextStroke = settings.outlineEnabled
+    ? `${Number(settings.outlineWidth) || 2}px ${settings.outlineColor || "#000000"}`
+    : "0 transparent";
+  translatedLine.style.background = settings.backgroundEnabled
+    ? hexToRgba(settings.backgroundColor || "#000000", Number(settings.backgroundOpacity) / 100)
+    : "transparent";
+}
+
+function hexToRgba(hex, alpha) {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!match) return "rgba(0, 0, 0, 0.68)";
+  const value = Number.parseInt(match[1], 16);
+  const opacity = Math.max(0, Math.min(1, Number.isFinite(alpha) ? alpha : 0.68));
+  return `rgba(${value >> 16}, ${(value >> 8) & 255}, ${value & 255}, ${opacity})`;
 }
 
 function findSubtitleContainer() {
@@ -185,6 +207,7 @@ function showTranslation(text, version) {
   if (version !== requestVersion) return;
   translatedLine.textContent = text;
   statusLine.textContent = "";
+  positionOverlay();
 }
 
 function positionOverlay(container = findSubtitleContainer()) {
@@ -196,8 +219,30 @@ function positionOverlay(container = findSubtitleContainer()) {
     ? [...container.querySelectorAll(".caption-window")].filter((node) => node.textContent.trim()).at(-1) || container
     : container;
   const rect = anchor.getBoundingClientRect();
-  const bottomGap = Math.max(40, window.innerHeight - rect.top + 8);
-  overlay.style.bottom = `${bottomGap}px`;
+  overlay.style.top = "";
+  overlay.style.bottom = "";
+  if (settings.position === "below") {
+    overlay.style.top = `${Math.min(window.innerHeight - 40, rect.bottom + 8)}px`;
+  } else if (settings.position === "top") {
+    overlay.style.top = `${Math.max(8, window.innerHeight * 0.1)}px`;
+  } else if (settings.position === "bottom") {
+    overlay.style.bottom = `${Math.max(8, window.innerHeight * 0.1)}px`;
+  } else {
+    overlay.style.bottom = `${Math.max(40, window.innerHeight - rect.top + 8)}px`;
+  }
+  if (settings.position === "top" || settings.position === "bottom") {
+    requestAnimationFrame(() => {
+      const overlayRect = overlay.getBoundingClientRect();
+      const overlaps = overlayRect.bottom > rect.top - 4 && overlayRect.top < rect.bottom + 4;
+      if (!overlaps) return;
+      // If the preferred fixed slot collides with the player's caption, fall
+      // back to the side of the caption with more available room.
+      overlay.style.top = "";
+      overlay.style.bottom = rect.top > window.innerHeight / 2
+        ? `${Math.max(40, window.innerHeight - rect.top + 8)}px`
+        : `${Math.max(8, window.innerHeight - rect.bottom - overlayRect.height - 8)}px`;
+    });
+  }
 }
 
 function clearSubtitle() {

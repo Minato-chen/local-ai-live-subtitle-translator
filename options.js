@@ -1,10 +1,17 @@
 const DEFAULTS = {
-  contextLines: 0,
+  contextLines: 1,
   source: "auto",
   target: "zh",
-  fontSize: 28,
-  bilingual: false,
-  serviceUrl: "http://127.0.0.1:8080"
+  fontSize: 26,
+  serviceUrl: "http://127.0.0.1:8080",
+  textColor: "#ffffff",
+  outlineEnabled: false,
+  outlineColor: "#000000",
+  outlineWidth: 2,
+  backgroundEnabled: true,
+  backgroundColor: "#000000",
+  backgroundOpacity: 40,
+  position: "above"
 };
 
 const ids = Object.keys(DEFAULTS);
@@ -16,6 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (element.type === "checkbox") element.checked = settings[id];
     else element.value = settings[id];
   }
+  syncStyleControls();
 });
 
 document.getElementById("save").addEventListener("click", async () => {
@@ -26,6 +34,8 @@ document.getElementById("save").addEventListener("click", async () => {
   }
   values.fontSize = Number(values.fontSize) || DEFAULTS.fontSize;
   values.contextLines = Math.max(0, Math.min(8, Number(values.contextLines) || 0));
+  values.outlineWidth = Math.max(0, Math.min(6, Number(values.outlineWidth) || 0));
+  values.backgroundOpacity = Math.max(0, Math.min(100, Number(values.backgroundOpacity) || 0));
   await chrome.storage.sync.set(values);
   const status = document.getElementById("status");
   status.textContent = "已保存";
@@ -49,6 +59,16 @@ document.getElementById("checkService").addEventListener("click", async () => {
     button.disabled = false;
   }
 });
+
+document.getElementById("outlineEnabled").addEventListener("change", syncStyleControls);
+document.getElementById("backgroundEnabled").addEventListener("change", syncStyleControls);
+
+function syncStyleControls() {
+  document.getElementById("outlineColor").disabled = !document.getElementById("outlineEnabled").checked;
+  document.getElementById("outlineWidth").disabled = !document.getElementById("outlineEnabled").checked;
+  document.getElementById("backgroundColor").disabled = !document.getElementById("backgroundEnabled").checked;
+  document.getElementById("backgroundOpacity").disabled = !document.getElementById("backgroundEnabled").checked;
+}
 
 function validateLocalAddress(value) {
   let url;
