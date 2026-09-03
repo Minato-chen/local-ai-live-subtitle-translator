@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "本地 AI 实时字幕翻译"
+  },
+  "extensionDescription": {
+    "message": "读取 Netflix 和 YouTube 字幕，通过兼容 OpenAI API 的本地翻译服务实时显示中文翻译。"
+  }
+}
