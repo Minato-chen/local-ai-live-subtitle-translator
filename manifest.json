@@ -3,6 +3,12 @@
   "name": "实时字幕翻译",
   "version": "1.5.0",
   "description": "读取 Netflix 和 YouTube 字幕，通过兼容 OpenAI API 的本地翻译服务实时显示中文翻译。",
+  "icons": {
+    "16": "icons/icon-idle-16.png",
+    "32": "icons/icon-idle-32.png",
+    "48": "icons/icon-idle-48.png",
+    "128": "icons/icon-idle-128.png"
+  },
   "permissions": ["storage"],
   "host_permissions": [
     "https://www.netflix.com/*",
@@ -24,6 +30,12 @@
   "options_page": "options.html",
   "action": {
     "default_title": "实时字幕翻译",
+    "default_icon": {
+      "16": "icons/icon-idle-16.png",
+      "32": "icons/icon-idle-32.png",
+      "48": "icons/icon-idle-48.png",
+      "128": "icons/icon-idle-128.png"
+    },
     "default_popup": "popup.html"
   }
 }

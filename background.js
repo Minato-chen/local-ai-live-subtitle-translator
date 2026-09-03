@@ -7,6 +7,30 @@ const DEFAULTS = {
 
 const activeTranslations = new Map();
 const modelCache = new Map();
+const ICONS = {
+  idle: { 16: "icons/icon-idle-16.png", 32: "icons/icon-idle-32.png", 48: "icons/icon-idle-48.png", 128: "icons/icon-idle-128.png" },
+  active: { 16: "icons/icon-active-16.png", 32: "icons/icon-active-32.png", 48: "icons/icon-active-48.png", 128: "icons/icon-active-128.png" }
+};
+
+function isSupportedPage(url) {
+  try {
+    const host = new URL(url).hostname;
+    return host === "www.netflix.com" || host === "www.youtube.com";
+  } catch {
+    return false;
+  }
+}
+
+function updateTabIcon(tabId, url) {
+  chrome.action.setIcon({ tabId, path: isSupportedPage(url) ? ICONS.active : ICONS.idle }).catch(() => {});
+}
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url || changeInfo.status === "loading") updateTabIcon(tabId, changeInfo.url || tab.url);
+});
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  chrome.tabs.get(tabId).then((tab) => updateTabIcon(tabId, tab.url)).catch(() => {});
+});
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "TRANSLATE") {
