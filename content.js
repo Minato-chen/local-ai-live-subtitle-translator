@@ -2,12 +2,9 @@ const DEFAULTS = {
   enabled: true,
   bilingual: false,
   fontSize: 28,
-  delayMs: 180,
-  provider: "ollama",
   source: "auto",
   target: "zh",
-  ollamaModel: "maternion/hy-mt2:1.8b",
-  contextLines: 1
+  contextLines: 0
 };
 
 const cache = new Map();
@@ -16,7 +13,11 @@ let settings = { ...DEFAULTS };
 let lastSource = "";
 let requestVersion = 0;
 let debounceTimer;
-let warmedWatchId = "";
+let translationInFlight = false;
+let queuedTranslation = null;
+let activeRequestId = null;
+let nextRequestId = 0;
+let extensionContextInvalid = false;
 let overlay;
 let translatedLine;
 let sourceLine;
@@ -31,9 +32,7 @@ async function init() {
     for (const [key, value] of Object.entries(changes)) settings[key] = value.newValue;
     cache.clear();
     subtitleHistory.length = 0;
-    warmedWatchId = "";
     applySettings();
-    maybeWarmUp();
     scanSubtitles();
   });
 
@@ -43,7 +42,7 @@ async function init() {
     characterData: true
   });
 
-  window.addEventListener("resize", positionOverlay, { passive: true });
+  window.addEventListener("resize", () => positionOverlay(), { passive: true });
   setInterval(scanSubtitles, 500);
   scanSubtitles();
 }
@@ -92,7 +91,7 @@ function readSubtitle(container) {
 }
 
 function scanSubtitles() {
-  maybeWarmUp();
+  if (extensionContextInvalid) return;
   if (!settings.enabled || !overlay) return;
   const container = findSubtitleContainer();
   if (!container) {
@@ -104,44 +103,63 @@ function scanSubtitles() {
   const text = readSubtitle(container);
   if (!text || text === lastSource) return;
   lastSource = text;
+  const version = ++requestVersion;
   sourceLine.textContent = text;
+  translatedLine.textContent = "...";
   statusLine.textContent = "";
   const context = subtitleHistory.slice(-Math.max(0, Number(settings.contextLines) || 0));
   subtitleHistory.push(text);
   if (subtitleHistory.length > 20) subtitleHistory.shift();
 
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => requestTranslation(text, context), settings.delayMs);
+  // Netflix often rebuilds the same subtitle node several times in one frame.
+  // A tiny fixed window avoids cancelling a nearly finished translation while
+  // remaining imperceptible to the viewer.  Do not use the legacy delayMs
+  // value: it was never exposed in settings and may be stale in sync storage.
+  debounceTimer = setTimeout(() => requestTranslation(text, context, version), 80);
 }
 
-function maybeWarmUp() {
-  if (settings.provider !== "ollama" || !document.querySelector("video")) return;
-  const watchId = location.pathname.match(/^\/watch\/(\d+)/)?.[1];
-  if (!watchId || watchId === warmedWatchId) return;
-
+function cancelActiveTranslation() {
+  if (!activeRequestId) return;
   const runtime = globalThis.chrome?.runtime;
-  if (!runtime?.sendMessage) return;
-  warmedWatchId = watchId;
-  runtime.sendMessage({ type: "WARM_UP" }).catch(() => {});
+  runtime?.sendMessage?.({ type: "CANCEL_TRANSLATION", requestId: activeRequestId }).catch(() => {});
 }
 
-async function requestTranslation(text, context) {
-  const version = ++requestVersion;
-  const cacheKey = settings.provider === "ollama"
-    ? JSON.stringify([settings.provider, settings.ollamaModel, settings.source, settings.target, context, text])
-    : JSON.stringify([settings.provider, settings.source, settings.target, text]);
+async function requestTranslation(text, context, version) {
+  if (translationInFlight) {
+    queuedTranslation = { text, context, version };
+    cancelActiveTranslation();
+    return;
+  }
+  translationInFlight = true;
+  const requestId = `subtitle-${++nextRequestId}`;
+  activeRequestId = requestId;
+  try {
+    await translateOne(text, context, version, requestId);
+  } finally {
+    translationInFlight = false;
+    activeRequestId = null;
+    const next = queuedTranslation;
+    queuedTranslation = null;
+    if (next && next.text === lastSource && next.version === requestVersion) {
+      requestTranslation(next.text, next.context, next.version);
+    }
+  }
+}
+
+async function translateOne(text, context, version, requestId) {
+  const cacheKey = JSON.stringify([settings.source, settings.target, context, text]);
   if (cache.has(cacheKey)) {
     showTranslation(cache.get(cacheKey), version);
     return;
   }
 
-  translatedLine.textContent = "...";
   try {
     const runtime = globalThis.chrome?.runtime;
     if (!runtime?.sendMessage) {
       throw new Error("扩展已更新，请刷新 Netflix 页面");
     }
-    const response = await runtime.sendMessage({ type: "TRANSLATE", text, context });
+    const response = await runtime.sendMessage({ type: "TRANSLATE", text, context, requestId });
     if (version !== requestVersion || text !== lastSource) return;
     if (!response?.ok) throw new Error(response?.error || "翻译失败");
     cache.set(cacheKey, response.translatedText);
@@ -150,6 +168,12 @@ async function requestTranslation(text, context) {
   } catch (error) {
     if (version !== requestVersion) return;
     translatedLine.textContent = "";
+    if (/extension context invalidated/i.test(error.message)) {
+      extensionContextInvalid = true;
+      queuedTranslation = null;
+      statusLine.textContent = "中文字幕：扩展已更新，请刷新 Netflix 页面";
+      return;
+    }
     statusLine.textContent = `中文字幕：${error.message}`;
   }
 }

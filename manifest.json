@@ -2,13 +2,11 @@
   "manifest_version": 3,
   "name": "Netflix 实时中文字幕",
   "version": "1.4.0",
-  "description": "读取 Netflix 字幕，通过 LibreTranslate 或 Ollama 实时显示中文翻译。",
+  "description": "读取 Netflix 字幕，通过本机 llama.cpp 与 Hy-MT2 实时显示中文翻译。",
   "permissions": ["storage"],
   "host_permissions": [
     "https://www.netflix.com/*",
-    "http://localhost/*",
-    "http://127.0.0.1/*",
-    "https://libretranslate.com/*"
+    "http://127.0.0.1/*"
   ],
   "background": {
     "service_worker": "background.js"

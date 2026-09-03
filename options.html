@@ -9,50 +9,20 @@
 <body>
   <main>
     <h1>Netflix 实时中文字幕</h1>
-    <p class="hint">选择轻量快速翻译，或使用带上下文的本机 AI 高质量翻译。</p>
-    <label>翻译方式
-      <select id="provider">
-        <option value="libretranslate">LibreTranslate（快速、占用低）</option>
-        <option value="ollama">Ollama 本地 AI（质量更高、支持上下文）</option>
-      </select>
-    </label>
-    <div id="libreSettings" class="provider-settings">
-      <label>LibreTranslate 接口地址
-        <input id="endpoint" type="url" placeholder="http://127.0.0.1:5001/translate">
-      </label>
-      <label>API Key（本机服务通常留空）
-        <input id="apiKey" type="password" autocomplete="off">
-      </label>
-    </div>
-    <div id="ollamaSettings" class="provider-settings">
-      <label>Ollama 接口地址
-        <input id="ollamaEndpoint" type="url" placeholder="http://127.0.0.1:11434/api/chat">
-      </label>
-      <div class="row two">
-        <label>模型
-          <input id="ollamaModel" value="maternion/hy-mt2:1.8b">
-        </label>
-        <label>参考前文条数
-          <input id="contextLines" type="number" min="0" max="8">
-        </label>
-      </div>
-      <p class="hint">实时优先可用 qwen3:1.7b；专用翻译可用 Hy-MT2 1.8B；质量优先可用 qwen3:4b-instruct。</p>
-      <p class="hint">自动识别语言可将源语言设为 <code class="inline">auto</code>。Hy-MT2 模型名为 <code class="inline">maternion/hy-mt2:1.8b</code>。</p>
-    </div>
+    <p class="hint">使用本机 llama.cpp 与 Hy-MT2 Q4_K_M 翻译 Netflix 字幕。</p>
     <div class="row">
       <label>源语言<input id="source" value="auto" placeholder="自动识别填 auto"></label>
       <label>目标语言<input id="target" value="zh"></label>
       <label>中文字幕字号<input id="fontSize" type="number" min="16" max="60"></label>
+      <label>参考前文条数<input id="contextLines" type="number" min="0" max="8"></label>
     </div>
     <label class="check"><input id="bilingual" type="checkbox"> 在翻译框内复制英文原文（Netflix 原字幕仍会保留）</label>
     <button id="save">保存设置</button>
     <span id="status"></span>
     <section>
-      <h2>本机启动 LibreTranslate</h2>
-      <code>docker start netflix-translator</code>
-      <h2>本机启动 Ollama</h2>
-      <code>ollama pull qwen3:4b-instruct</code>
-      <p class="hint">Ollama 应用运行时会在本机 11434 端口提供接口，不需要 Docker。</p>
+      <h2>启动本机翻译服务</h2>
+      <code>llama.exe serve -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M -ngl all -c 2048 -np 1 -a hy-mt2-fast</code>
+      <p class="hint">首次运行会下载模型。保持该窗口开启后，刷新 Netflix 播放页面即可。</p>
     </section>
   </main>
   <script src="options.js"></script>

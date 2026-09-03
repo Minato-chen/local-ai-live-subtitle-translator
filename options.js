@@ -1,10 +1,5 @@
 const DEFAULTS = {
-  provider: "ollama",
-  endpoint: "http://127.0.0.1:5001/translate",
-  apiKey: "",
-  ollamaEndpoint: "http://127.0.0.1:11434/api/chat",
-  ollamaModel: "maternion/hy-mt2:1.8b",
-  contextLines: 1,
+  contextLines: 0,
   source: "auto",
   target: "zh",
   fontSize: 28,
@@ -20,16 +15,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (element.type === "checkbox") element.checked = settings[id];
     else element.value = settings[id];
   }
-  updateProviderVisibility();
 });
-
-document.getElementById("provider").addEventListener("change", updateProviderVisibility);
-
-function updateProviderVisibility() {
-  const provider = document.getElementById("provider").value;
-  document.getElementById("libreSettings").hidden = provider !== "libretranslate";
-  document.getElementById("ollamaSettings").hidden = provider !== "ollama";
-}
 
 document.getElementById("save").addEventListener("click", async () => {
   const values = {};

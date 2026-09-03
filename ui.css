@@ -31,7 +31,7 @@ select {
 }
 .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .row.two { grid-template-columns: 2fr 1fr; }
-.provider-settings[hidden] { display: none; }
+[hidden] { display: none !important; }
 .check { display: flex; align-items: center; gap: 8px; }
 button {
   cursor: pointer;
