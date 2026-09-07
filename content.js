@@ -12,7 +12,8 @@ const DEFAULTS = {
   backgroundEnabled: true,
   backgroundColor: "#000000",
   backgroundOpacity: 40,
-  position: "above"
+  position: "above",
+  uiLanguage: "zh"
 };
 
 const cache = new Map();
@@ -189,7 +190,7 @@ async function translateOne(text, context, version, requestId) {
   try {
     const runtime = globalThis.chrome?.runtime;
     if (!runtime?.sendMessage) {
-      throw new Error("扩展已更新，请刷新 Netflix 页面");
+      throw new Error("扩展已更新，请刷新播放页面");
     }
     const response = await runtime.sendMessage({ type: "TRANSLATE", text, context, requestId });
     if (version !== requestVersion || text !== lastSource) return;
@@ -203,10 +204,18 @@ async function translateOne(text, context, version, requestId) {
     if (/extension context invalidated/i.test(error.message)) {
       extensionContextInvalid = true;
       queuedTranslation = null;
-      statusLine.textContent = "中文字幕：扩展已更新，请刷新 Netflix 页面";
+      statusLine.textContent = "提示：扩展已更新，请刷新播放页面";
       return;
     }
-    statusLine.textContent = `中文字幕：${error.message}`;
+    const isOffline = /无法连接|Failed to fetch|NetworkError|ECONNREFUSED|127\.0\.0\.1|localhost/i.test(error.message);
+    const isEn = settings.uiLanguage === "en" || !/^zh/i.test(navigator.language);
+    if (isOffline) {
+      statusLine.textContent = isEn
+        ? "Notice: Local AI service not connected. Please start llama.cpp (127.0.0.1:8080) or check extension settings."
+        : "提示：未连接到本地 AI 翻译服务，请启动 llama.cpp (127.0.0.1:8080) 或在扩展设置中配置。";
+    } else {
+      statusLine.textContent = isEn ? `Notice: ${error.message}` : `提示：${error.message}`;
+    }
   }
 }
 

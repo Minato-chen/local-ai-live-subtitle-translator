@@ -13,12 +13,13 @@
     <p class="hint">将 Netflix 或 YouTube 字幕发送到你选择的翻译服务；默认推荐本机 llama.cpp + Hy-MT2。</p>
     <section>
       <h2>启动本地翻译服务</h2>
+      <p class="hint">如果未安装 llama.cpp，请按照 <a id="readmeLink" class="link" href="https://github.com/Minato-chen/local-ai-live-subtitle-translator/blob/main/README.md" target="_blank">安装指南 (README)</a> 进行安装。</p>
       <p class="hint">推荐使用 Hy-MT2；首次运行会下载模型。使用其他模型时，请按模型文档启动兼容服务。</p>
       <code>llama serve -hf tencent/Hy-MT2-1.8B-GGUF:Q4_K_M -ngl 99 -c 2048 -np 1 -a hy-mt2-fast</code>
       <p class="hint">保持服务窗口开启，然后刷新 Netflix 或 YouTube 播放页面。</p>
     </section>
     <section>
-      <h2>本地服务连接（可选）</h2>
+      <h2>本地服务连接</h2>
       <label>本地服务地址<input id="serviceUrl" type="url" inputmode="url" placeholder="http://127.0.0.1:8080"></label>
       <div class="actions"><button id="checkService" type="button">检查服务</button><span id="serviceStatus" class="hint" role="status"></span></div>
       <p class="hint">默认地址为 <code class="inline">http://127.0.0.1:8080</code>。可修改端口，但服务必须运行在本机，并提供 OpenAI 兼容接口。</p>

@@ -113,11 +113,23 @@ function serviceEndpoint(serviceUrl, path) {
   return `${url.origin}${basePath}${path}`;
 }
 
+function wrapFetchError(error, serviceUrl) {
+  if (error.name === "TypeError" && /fetch/i.test(error.message)) {
+    return new Error(`无法连接到本地翻译服务 (${serviceUrl || "http://127.0.0.1:8080"})，请先在本地启动 AI 服务。`);
+  }
+  return error;
+}
+
 async function discoverModel(serviceUrl) {
   const endpoint = serviceEndpoint(serviceUrl, "/v1/models");
   const cached = modelCache.get(endpoint);
   if (cached) return cached;
-  const modelsResponse = await fetch(endpoint);
+  let modelsResponse;
+  try {
+    modelsResponse = await fetch(endpoint);
+  } catch (error) {
+    throw wrapFetchError(error, serviceUrl);
+  }
   if (!modelsResponse.ok) throw new Error(`模型列表返回 HTTP ${modelsResponse.status}`);
   const modelsData = await modelsResponse.json();
   const model = modelsData?.data?.map((item) => item?.id).find(Boolean);
@@ -202,7 +214,7 @@ async function fetchOnce(url, timeoutMs, payload, parseResponse, externalSignal)
   } catch (error) {
     if (externalSignal?.aborted) throw new Error("翻译已取消");
     if (error.name === "AbortError") throw new Error("翻译请求超时");
-    throw error;
+    throw wrapFetchError(error, url);
   } finally {
     clearTimeout(timer);
   }
