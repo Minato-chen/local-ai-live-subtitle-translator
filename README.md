@@ -2,6 +2,8 @@
 
 [English README](README.en.md)
 
+[从Edge扩展商店下载本插件](https://microsoftedge.microsoft.com/addons/detail/odmlonebpcbphjogbopioojopjecioge)
+
 Edge/Chrome 扩展：读取 Netflix 或 YouTube 播放器中的原字幕，通过本机兼容 OpenAI API 的翻译服务实时显示中文字幕。默认推荐 `llama.cpp + Hy-MT2 Q4_K_M`。
 
 ## 安装
