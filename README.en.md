@@ -8,6 +8,8 @@ An Edge/Chrome extension that reads the subtitles displayed by Netflix or YouTub
 
 ## Installation
 
+Watch this [video](https://youtu.be/2KG4V-mdfIE)
+
 1. Install llama.cpp.
 
    The recommended installation method is [llama.app](https://llama.app/).
