@@ -7,6 +7,7 @@ Edge/Chrome 扩展：读取 Netflix 或 YouTube 播放器中的原字幕，通�
 [从Edge扩展商店下载本插件](https://microsoftedge.microsoft.com/addons/detail/odmlonebpcbphjogbopioojopjecioge)
 
 ## 安装
+[video](https://youtu.be/2KG4V-mdfIE)
 
 1. 安装 llama.cpp。
 
