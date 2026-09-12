@@ -4,6 +4,8 @@
 
 An Edge/Chrome extension that reads the subtitles displayed by Netflix or YouTube, sends them to a local OpenAI-compatible translation service, and shows translated subtitles in real time. The recommended default setup is `llama.cpp + Hy-MT2 Q4_K_M`.
 
+[Download from microsoft-edge-extensions](https://microsoftedge.microsoft.com/addons/detail/odmlonebpcbphjogbopioojopjecioge)
+
 ## Installation
 
 1. Install llama.cpp.
