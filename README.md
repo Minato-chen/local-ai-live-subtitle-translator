@@ -26,7 +26,7 @@ Edge/Chrome 扩展：读取 Netflix 或 YouTube 播放器中的原字幕，通�
    curl -LsSf https://llama.app/install.sh | sh
    ```
 
-2. 打开浏览器扩展管理页面，启用开发人员模式，选择“加载解压缩的扩展”，并选择本项目所在目录。
+2. （从edge扩展商店安装的话跳过这步）打开浏览器扩展管理页面，启用开发人员模式，选择“加载解压缩的扩展”，并选择本项目所在目录。
 
    Edge：`edge://extensions`
 
