@@ -26,7 +26,7 @@ Watch this [video](https://youtu.be/2KG4V-mdfIE).
    curl -LsSf https://llama.app/install.sh | sh
    ```
 
-2. Open your browser's extensions page, enable Developer mode, select **Load unpacked**, and choose this project's directory.
+2. (Skip this step if installing from edge extension store)Open your browser's extensions page, enable Developer mode, select **Load unpacked**, and choose this project's directory.
 
    Edge: `edge://extensions`
 
