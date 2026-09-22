@@ -80,6 +80,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "ADD_ANKI_NOTE") {
+    addValidatedAnkiNote(message.note, message.ankiUrl)
+      .then((noteId) => sendResponse({ ok: true, noteId }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
   if (message?.type === "CHECK_SERVICE") {
     checkService(message.serviceUrl)
       .then((result) => sendResponse({ ok: true, ...result }))
@@ -129,6 +136,20 @@ async function invokeAnki(action, params = {}, explicitUrl) {
     if (error.name === "TypeError") throw new Error("无法连接 AnkiConnect，请确认 Anki 已启动并安装插件");
     throw error;
   } finally { clearTimeout(timer); }
+}
+
+async function addValidatedAnkiNote(note, ankiUrl) {
+  const [decks, models] = await Promise.all([
+    invokeAnki("deckNames", {}, ankiUrl),
+    invokeAnki("modelNames", {}, ankiUrl)
+  ]);
+  const fields = models.includes(note?.modelName)
+    ? await invokeAnki("modelFieldNames", { modelName: note.modelName }, ankiUrl)
+    : [];
+  AnkiLib.validateNoteAgainstMetadata(note, { decks, models, fields });
+  const canAdd = await invokeAnki("canAddNotes", { notes: [note] }, ankiUrl);
+  if (!canAdd?.[0]) throw new Error("该卡片可能重复或字段无效");
+  return invokeAnki("addNote", { note }, ankiUrl);
 }
 
 async function translateWithLlamaCpp(text, context, settings, signal) {

@@ -517,9 +517,9 @@ async function submitAnkiNote(deck, fields, button) {
     const values = Object.fromEntries(Object.entries(fields).filter(([key]) => key !== "tags").map(([key, field]) => [key, field.value]));
     const tags = fields.tags.value.split(/\s+/).filter(Boolean);
     const note = AnkiLib.buildNote({ deckName: deck.value, modelName: settings.ankiModel, fieldMap: settings.ankiFieldMap, values, tags });
-    const canAdd = await ankiAction("canAddNotes", { notes: [note] });
-    if (!canAdd?.[0]) throw new Error(uiText("该卡片可能重复或字段无效", "The note may be a duplicate or invalid"));
-    const noteId = await ankiAction("addNote", { note });
+    const response = await chrome.runtime.sendMessage({ type: "ADD_ANKI_NOTE", note, ankiUrl: settings.ankiUrl });
+    if (!response?.ok) throw new Error(response?.error || uiText("添加失败", "Add failed"));
+    const noteId = response.noteId;
     sessionDeck = deck.value;
     renderPanelMessage(editorPanel, uiText(`已添加到 Anki（${noteId}）`, `Added to Anki (${noteId})`));
   } catch (error) { renderEditorStatus(error.message, true); button.disabled = false; }

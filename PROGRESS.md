@@ -35,3 +35,13 @@
 - Added AnkiConnect installation, `requestPermission`, CORS recovery, loopback-only exposure, deck strategy, and privacy documentation in Chinese and English.
 - Stage 3 is complete; live connection testing remains unavailable unless Anki Desktop and AnkiConnect are running on the host and is covered by the Stage 5 manual matrix.
 - Host probe: `127.0.0.1:8765` refused the connection, confirming AnkiConnect is not currently running; no user installation or configuration was changed.
+
+## Stage 4 — Editable Anki note workflow
+
+- The dictionary card exposes one Anki button; no Anki metadata request is made until the user opens the editor.
+- Added an editable modal for term, meaning, original video sentence, generated example/translation, source, tags, and target deck.
+- Existing decks are loaded on demand; new decks require an explicit name and confirmation action. The last choice is remembered only for the current page session.
+- Submission is locked against double-clicks and is revalidated in the service worker against live deck, model, and field metadata before duplicate checking and `addNote`.
+- All Anki field values are HTML-escaped before transport; URL and model text are never injected as HTML. No note content is stored in browser storage.
+- Tests: `npm test` — 17/17 passing; syntax and manifest checks pass.
+- Live add/duplicate behavior still requires a running AnkiConnect instance for Stage 5 manual verification.
