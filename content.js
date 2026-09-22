@@ -162,6 +162,7 @@ function scanSubtitles() {
   lastSource = text;
   const version = ++requestVersion;
   sourceLine.textContent = text;
+  updatePausedUi();
   translatedLine.textContent = "...";
   statusLine.textContent = "";
   const context = subtitleHistory.slice(-Math.max(0, Number(settings.contextLines) || 0));
