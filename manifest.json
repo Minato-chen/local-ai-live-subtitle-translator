@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
-  "version": "2.0.4",
+  "version": "2.1.0",
   "description": "__MSG_extensionDescription__",
   "default_locale": "zh_CN",
   "icons": {
@@ -15,7 +15,8 @@
     "https://www.netflix.com/*",
     "https://www.youtube.com/*",
     "http://127.0.0.1/*",
-    "http://localhost/*"
+    "http://localhost/*",
+    "http://[::1]/*"
   ],
   "background": {
     "service_worker": "background.js"

@@ -45,3 +45,14 @@
 - All Anki field values are HTML-escaped before transport; URL and model text are never injected as HTML. No note content is stored in browser storage.
 - Tests: `npm test` — 17/17 passing; syntax and manifest checks pass.
 - Live add/duplicate behavior still requires a running AnkiConnect instance for Stage 5 manual verification.
+
+## Stage 5 — Final verification and release preparation
+
+- Automated suite: 17/17 passing on Node's built-in test runner.
+- Static checks: all extension JavaScript parses, `manifest.json` and locale JSON parse, and `git diff --check` is clean.
+- Browser smoke check: Microsoft Edge 153 accepted the unpacked extension in a fresh isolated headless profile and rendered a page without extension manifest/service-worker parse errors. macOS headless display/crashpad warnings were environmental and did not identify extension code failures.
+- Version prepared as `2.1.0`; Chinese extension description and both READMEs now cover paused lookup, dual examples, Anki setup, deck strategy, permissions, privacy, and troubleshooting.
+- Blocked manual matrix: authenticated Netflix playback, interactive YouTube layout/fullscreen selection, and Chrome-vs-Edge manual input require a user-visible browser session and media access.
+- Blocked Anki matrix: no process is listening on local AnkiConnect port 8765. Installing/configuring Anki or writing test notes without the user's environment would exceed the authorized safety boundary.
+- No remote push was performed and no user browser/Anki configuration was modified.
+- Final lifecycle audit fixed two interaction leaks: playback now clears only selections owned by the extension (never arbitrary page selections), and a changed subtitle closes/cancels the prior lookup/editor as specified.

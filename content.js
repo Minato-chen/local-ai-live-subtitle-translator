@@ -74,7 +74,6 @@ async function init() {
   });
 
   window.addEventListener("resize", () => positionOverlay(), { passive: true });
-  document.addEventListener("selectionchange", handleSelectionChange, { passive: true });
   document.addEventListener("mouseup", handleSelectionMouseUp);
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeInteractivePanels(); });
   document.addEventListener("visibilitychange", () => { if (document.hidden) exitPausedInteraction(); });
@@ -159,6 +158,7 @@ function scanSubtitles() {
   positionOverlay(container);
   const text = readSubtitle(container);
   if (!text || text === lastSource) return;
+  if (lastSource) closeInteractivePanels();
   lastSource = text;
   const version = ++requestVersion;
   sourceLine.textContent = text;
@@ -399,7 +399,8 @@ function updatePausedUi() {
 
 function exitPausedInteraction() {
   videoPaused = false;
-  globalThis.getSelection?.()?.removeAllRanges();
+  const selection = globalThis.getSelection?.();
+  if (selectionInsideOverlay(selection)) selection.removeAllRanges();
   closeInteractivePanels();
 }
 
@@ -409,8 +410,9 @@ function selectionBelongsToSource(selection) {
   return sourceLine.contains(range.commonAncestorContainer);
 }
 
-function handleSelectionChange() {
-  if (!videoPaused && globalThis.getSelection?.()?.rangeCount) globalThis.getSelection().removeAllRanges();
+function selectionInsideOverlay(selection) {
+  if (!selection || !selection.rangeCount || !overlay) return false;
+  return overlay.contains(selection.anchorNode) || overlay.contains(selection.focusNode);
 }
 
 function handleSelectionMouseUp(event) {
