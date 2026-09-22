@@ -111,9 +111,21 @@ async function lookupWord(message, signal) {
   if (dictionaryCache.has(cacheKey)) return dictionaryCache.get(cacheKey);
   const model = await discoverModel(settings.serviceUrl);
   const messages = DictionaryLib.buildDictionaryMessages({ term, sentence, source: message.source, target: message.target });
-  const entry = await fetchWithTimeout(serviceEndpoint(settings.serviceUrl, "/v1/chat/completions"), settings.timeoutMs, {
-    model, stream: false, temperature: 0.1, max_tokens: 500, messages
-  }, DictionaryLib.parseDictionaryResponse, signal);
+  const endpoint = serviceEndpoint(settings.serviceUrl, "/v1/chat/completions");
+  const basePayload = { model, stream: false, temperature: 0.1, max_tokens: 500, messages };
+  let entry;
+  try {
+    entry = await fetchWithTimeout(endpoint, settings.timeoutMs, {
+      ...basePayload,
+      response_format: DictionaryLib.dictionaryResponseFormat()
+    }, DictionaryLib.parseDictionaryResponse, signal);
+  } catch (error) {
+    // Older OpenAI-compatible servers may reject llama.cpp's schema extension.
+    // Fall back only for an explicit unsupported-parameter response; malformed
+    // model output should remain visible instead of silently issuing a second request.
+    if (!/HTTP 400|response.format|json.schema|unsupported|unknown (field|parameter)/i.test(error.message)) throw error;
+    entry = await fetchWithTimeout(endpoint, settings.timeoutMs, basePayload, DictionaryLib.parseDictionaryResponse, signal);
+  }
   if (!entry.term) entry.term = term;
   dictionaryCache.set(cacheKey, entry);
   if (dictionaryCache.size > 200) dictionaryCache.delete(dictionaryCache.keys().next().value);

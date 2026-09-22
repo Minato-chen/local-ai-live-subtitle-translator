@@ -48,3 +48,7 @@ Automated coverage includes selection normalization, loopback URL enforcement, H
 3. Confirm duplicate behavior against the user's actual Anki note model and existing collection.
 
 These checks are blocked in the current environment because Netflix/browser interaction needs a visible authenticated media session and no AnkiConnect service is running. No attempt was made to install software, change user configuration, create test notes, or push commits remotely.
+
+## Post-release correction
+
+- Dictionary requests now use llama.cpp schema-constrained JSON output. This fixes “词典返回格式无效” responses from models that did not obey a prose-only JSON instruction.

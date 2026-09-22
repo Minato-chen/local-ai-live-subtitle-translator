@@ -56,3 +56,10 @@
 - Blocked Anki matrix: no process is listening on local AnkiConnect port 8765. Installing/configuring Anki or writing test notes without the user's environment would exceed the authorized safety boundary.
 - No remote push was performed and no user browser/Anki configuration was modified.
 - Final lifecycle audit fixed two interaction leaks: playback now clears only selections owned by the extension (never arbitrary page selections), and a changed subtitle closes/cancels the prior lookup/editor as specified.
+
+## Post-release fix — Structured dictionary output
+
+- Root cause: the dictionary prompt requested JSON in prose but did not activate llama.cpp's schema-constrained sampler, so translation-focused models such as Hy-MT2 could return ordinary text and trigger “词典返回格式无效”.
+- Added `response_format: { type: "json_object", schema: ... }` with a closed, required dictionary schema. This makes llama.cpp constrain generation to valid JSON instead of relying only on model instruction-following.
+- Added a narrowly scoped fallback for older compatible servers that explicitly reject the structured-output parameter; malformed model output is not retried silently.
+- Regression suite: 18/18 tests passing.
