@@ -21,10 +21,12 @@ const DEFAULTS = {
 };
 
 const ids = Object.keys(DEFAULTS);
+let loadedSettings = { ...DEFAULTS };
 
 document.addEventListener("DOMContentLoaded", async () => {
   await initI18n();
   const settings = await chrome.storage.sync.get(DEFAULTS);
+  loadedSettings = settings;
   for (const id of ids) {
     const element = document.getElementById(id);
     if (element.type === "checkbox") element.checked = settings[id];
@@ -128,9 +130,11 @@ async function refreshAnkiMetadata(showStatus) {
   const status = document.getElementById("ankiStatus");
   try {
     if (showStatus) status.textContent = "正在连接…";
+    const permission = await ankiAction("requestPermission");
+    if (permission?.permission && permission.permission !== "granted") throw new Error("AnkiConnect 未授权此扩展，请在 Anki 中允许访问");
     const [version, decks, models] = await Promise.all([ankiAction("version"), ankiAction("deckNames"), ankiAction("modelNames")]);
-    fillSelect(document.getElementById("ankiDeck"), decks, document.getElementById("ankiDeck").value || DEFAULTS.ankiDeck);
-    fillSelect(document.getElementById("ankiModel"), models, document.getElementById("ankiModel").value || DEFAULTS.ankiModel);
+    fillSelect(document.getElementById("ankiDeck"), decks, document.getElementById("ankiDeck").value || loadedSettings.ankiDeck || DEFAULTS.ankiDeck);
+    fillSelect(document.getElementById("ankiModel"), models, document.getElementById("ankiModel").value || loadedSettings.ankiModel || DEFAULTS.ankiModel);
     await refreshAnkiFields();
     status.textContent = `AnkiConnect v${version} · ${decks.length} 个牌组`;
   } catch (error) { if (showStatus) status.textContent = `连接失败：${error.message}`; }

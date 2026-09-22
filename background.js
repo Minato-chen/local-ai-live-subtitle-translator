@@ -113,7 +113,7 @@ async function lookupWord(message, signal) {
   return entry;
 }
 
-const ANKI_ACTIONS = new Set(["version", "deckNames", "createDeck", "modelNames", "modelFieldNames", "canAddNotes", "addNote"]);
+const ANKI_ACTIONS = new Set(["requestPermission", "version", "deckNames", "createDeck", "modelNames", "modelFieldNames", "canAddNotes", "addNote"]);
 async function invokeAnki(action, params = {}, explicitUrl) {
   if (!ANKI_ACTIONS.has(action)) throw new Error("不支持的 Anki 操作");
   const settings = await chrome.storage.sync.get(DEFAULTS);

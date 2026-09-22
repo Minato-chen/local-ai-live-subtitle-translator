@@ -48,9 +48,25 @@ The settings page has three sections:
 - **Local service connection:** The default address is `http://127.0.0.1:8080`. Change the port if needed, then use **Check service** to verify the connection and run a sample translation. The service must expose an OpenAI-compatible `/v1/chat/completions` endpoint.
 - **Translation and subtitle display:** Configure source and target languages, font size, translation color, text outline, background color and opacity, display position, and the number of preceding subtitle lines to use as context. Language settings affect only the translation prompt; they do not switch models. Explicitly selecting a source language can make translation a little more reliable, but usually does not improve speed. More context can improve coherence, at the cost of slightly slower requests. Defaults are **Auto-detect → Simplified Chinese**, `26 px`, one context line, and 40% background opacity.
 
+## Lookup While Paused
+
+Enable paused lookup, then pause a video to reveal the current original subtitle retained by the extension. Select a word or phrase to ask the same local AI service for a concise definition, its meaning in the video sentence, and a separate generated example. Playback, Escape, or a subtitle change closes the panel. No lookup request is made while the video is playing, and playback controls remain unobstructed.
+
+AI definitions are learning aids rather than authoritative dictionary entries. Lookup text is sent only to the configured local OpenAI-compatible service.
+
+## Anki Integration
+
+1. Install Anki Desktop and install [AnkiConnect](https://ankiweb.net/shared/info/2055492159) from AnkiWeb. Restart Anki and keep it running.
+2. Enable Anki in the extension settings, keep the default URL `http://127.0.0.1:8765`, and click **Connect and refresh**. The extension uses AnkiConnect's `requestPermission` flow; approve the extension origin if Anki asks. If CORS is still denied, inspect `webCorsOriginList` under **Tools → Add-ons → AnkiConnect → Config**. Do not expose the bind address to a LAN or the public internet.
+3. Choose a default deck, note type, and field mapping. Term and meaning are required; video sentence, generated example, example translation, and source are optional.
+4. After lookup, click **Add to Anki**, review or edit the content, deck, and tags, then confirm. You can explicitly create a subdeck such as `Subtitle Learning::Movie title` from this editor.
+
+The recommended default is one long-lived deck organized with platform/title tags. The extension never creates a deck merely because a movie is opened. Note contents are not stored in browser sync and are sent to local AnkiConnect only after confirmation.
+
 ## Privacy and Disclaimer
 
 - This is an independent project. It is not affiliated with, endorsed by, or authorized by Netflix, YouTube, Google, or Microsoft.
 - The extension reads only the subtitles already displayed on the current playback page. It does not download or distribute video content, and it does not bypass DRM.
 - Subtitles are sent only to the translation service selected in the settings page, which defaults to `127.0.0.1:8080`. They are not sent to a server operated by this project's developer. The extension does not store subtitles, account information, cookies, or viewing history.
+- When Anki integration is enabled, only note fields explicitly confirmed by the user are sent to local AnkiConnect (default `127.0.0.1:8765`). The extension does not automatically create per-title decks or retain a note history.
 - Hy-MT2, llama.cpp, and any other models or services selected by the user are subject to their respective licenses and terms. Refer to the [Hy-MT2 model page](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF) for its license and terms.

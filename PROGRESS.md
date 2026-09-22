@@ -24,3 +24,14 @@
 - All untrusted model text is rendered with `textContent`; resuming playback, Escape, a newer lookup, or subtitle removal closes/cancels the interaction.
 - Added a persisted lookup toggle and bilingual UI copy.
 - Tests: `npm test` — 13/13 passing; syntax and manifest checks pass.
+
+## Stage 3 — AnkiConnect foundation (implementation)
+
+- Added a loopback-only AnkiConnect v6 client in the service worker with an explicit action allowlist and an 8-second timeout.
+- Added settings for connection URL, default deck, note type, field mapping, and tags, plus live connection/metadata refresh.
+- Added preservation of custom saved deck/model values until live metadata is available.
+- Added `createDeck` support for explicit user-created decks; no deck is created from merely opening a video.
+- Tests: `npm test` — 16/16 passing; syntax and manifest checks pass.
+- Added AnkiConnect installation, `requestPermission`, CORS recovery, loopback-only exposure, deck strategy, and privacy documentation in Chinese and English.
+- Stage 3 is complete; live connection testing remains unavailable unless Anki Desktop and AnkiConnect are running on the host and is covered by the Stage 5 manual matrix.
+- Host probe: `127.0.0.1:8765` refused the connection, confirming AnkiConnect is not currently running; no user installation or configuration was changed.

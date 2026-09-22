@@ -163,20 +163,20 @@
 
 ### 阶段 3：AnkiConnect 基础接入
 
-- [ ] **3.1 实现 AnkiConnect 客户端与安全边界**
+- [x] **3.1 实现 AnkiConnect 客户端与安全边界**
   - 修改文件：新增 `lib/anki.js`、修改 `background.js`、`manifest.json`、新增/扩展 `tests/anki.test.js`。
   - 实现要点：默认地址 `http://127.0.0.1:8765`；只接受 HTTP loopback 主机（`127.0.0.1`、`localhost`、`::1`）和有效端口；实现 `version`、`deckNames`、`createDeck`、`modelNames`、`modelFieldNames`、`canAddNotes`、`addNote`；校验 AnkiConnect `{result,error}` 包装。
   - 预期结果：所有 Anki 网络访问由后台完成，不开放任意远程 URL。
   - 验收标准：协议成功、Anki 未启动、插件未安装、HTTP 错误、协议 error、返回格式错误和超时均有单测或可复现检查；现有 localhost 翻译权限保持有效。
 
-- [ ] **3.2 增加 Anki 设置、连接测试和元数据刷新**
+- [x] **3.2 增加 Anki 设置、连接测试和元数据刷新**
   - 修改文件：`options.html`、`options.js`、`ui.css`、`i18n.js`。
   - 设置项：启用 Anki、AnkiConnect 地址、默认牌组、笔记类型、字段映射（词语/释义为必需，视频原句/AI 新例句/例句译文/来源为可选）、默认标签。
   - 实现要点：先测试连接，再拉取牌组和笔记类型；笔记类型变化后刷新字段；保存前验证必填映射不重复且字段确实存在；元数据只用于选择，不持久化大量列表。
   - 预期结果：不同 Anki 用户可把数据映射到自己的模型，不假定一定存在 `Basic`、`Front`、`Back`。
   - 验收标准：连接正常时可选择真实牌组/模型/字段；连接失败时不丢失已保存配置并给出安装/启动提示；禁用 Anki 时相关输入不可编辑且查词仍可用。
 
-- [ ] **3.3 增加权限与 AnkiConnect CORS 配置说明**
+- [x] **3.3 增加权限与 AnkiConnect CORS 配置说明**
   - 修改文件：`README.md`、`README.en.md`，必要时 `options.html`。
   - 实现要点：说明安装 AnkiConnect、保持 Anki Desktop 运行、允许扩展来源的配置方式；记录默认端口与最小暴露原则。
   - 预期结果：用户无需猜测“连接失败”的原因。
