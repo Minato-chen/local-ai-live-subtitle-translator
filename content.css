@@ -8,7 +8,6 @@
   text-align: center;
   pointer-events: none;
   font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.95));
 }
 
 #nf-zh-overlay .nf-zh-source,
@@ -20,12 +19,63 @@
   background: rgba(0, 0, 0, 0.68);
   color: white;
   line-height: 1.35;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.95));
 }
 
 #nf-zh-overlay .nf-zh-source {
   font-size: calc(var(--nf-zh-font-size) * 0.65);
   color: #e6e6e6;
 }
+
+#nf-zh-overlay.nf-zh-paused .nf-zh-source {
+  pointer-events: auto;
+  user-select: text;
+  cursor: text;
+  outline: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+#nf-zh-overlay .nf-zh-dictionary,
+#nf-zh-overlay .nf-zh-anki-editor {
+  position: fixed;
+  box-sizing: border-box;
+  width: min(330px, calc(100vw - 16px));
+  max-height: min(520px, calc(100vh - 16px));
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid #555;
+  border-radius: 10px;
+  background: rgba(24, 24, 24, 0.98);
+  color: #f5f5f5;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.45;
+  pointer-events: auto;
+  user-select: text;
+  filter: none;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+#nf-zh-overlay .nf-zh-anki-editor {
+  left: 50%;
+  top: 50%;
+  width: min(520px, calc(100vw - 24px));
+  transform: translate(-50%, -50%);
+}
+
+#nf-zh-overlay .nf-zh-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#nf-zh-overlay .nf-zh-dictionary p { margin: 6px 0; white-space: pre-wrap; }
+#nf-zh-overlay .nf-zh-meta { color: #bbb; }
+#nf-zh-overlay .nf-zh-error { color: #ff8a80; }
+#nf-zh-overlay .nf-zh-dictionary button,
+#nf-zh-overlay .nf-zh-anki-editor button { margin: 8px 8px 0 0; padding: 7px 11px; border: 0; border-radius: 5px; cursor: pointer; }
+#nf-zh-overlay .nf-zh-primary { background: #e50914; color: #fff; }
+#nf-zh-overlay .nf-zh-secondary { background: #444; color: #fff; }
+#nf-zh-overlay .nf-zh-close { margin: 0; background: transparent; color: #fff; font-size: 20px; }
+#nf-zh-overlay .nf-zh-anki-editor label { display: block; margin-top: 10px; color: #ddd; }
+#nf-zh-overlay .nf-zh-anki-editor input,
+#nf-zh-overlay .nf-zh-anki-editor textarea,
+#nf-zh-overlay .nf-zh-anki-editor select { box-sizing: border-box; width: 100%; margin-top: 4px; padding: 7px; color: #fff; background: #292929; border: 1px solid #555; border-radius: 4px; font: inherit; }
+#nf-zh-overlay .nf-zh-anki-editor textarea { min-height: 54px; resize: vertical; }
 
 #nf-zh-overlay .nf-zh-translation {
   font-size: var(--nf-zh-font-size);
@@ -47,3 +97,5 @@
 #nf-zh-overlay.nf-zh-disabled {
   display: none;
 }
+
+#nf-zh-overlay [hidden] { display: none !important; }

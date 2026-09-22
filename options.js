@@ -11,7 +11,13 @@ const DEFAULTS = {
   backgroundEnabled: true,
   backgroundColor: "#000000",
   backgroundOpacity: 40,
-  position: "above"
+  position: "above",
+  dictionaryEnabled: true,
+  ankiEnabled: false,
+  ankiUrl: "http://127.0.0.1:8765",
+  ankiDeck: "Default",
+  ankiModel: "Basic",
+  ankiTags: "subtitle-learning"
 };
 
 const ids = Object.keys(DEFAULTS);
@@ -25,22 +31,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     else element.value = settings[id];
   }
   syncStyleControls();
+  syncAnkiControls();
+  await refreshAnkiMetadata(false);
 });
 
 document.getElementById("save").addEventListener("click", async () => {
-  const values = {};
-  for (const id of ids) {
-    const element = document.getElementById(id);
-    values[id] = element.type === "checkbox" ? element.checked : element.value.trim();
-  }
-  values.fontSize = Number(values.fontSize) || DEFAULTS.fontSize;
-  values.contextLines = Math.max(0, Math.min(8, Number(values.contextLines) || 0));
-  values.outlineWidth = Math.max(0, Math.min(6, Number(values.outlineWidth) || 0));
-  values.backgroundOpacity = Math.max(0, Math.min(100, Number(values.backgroundOpacity) || 0));
-  await chrome.storage.sync.set(values);
   const status = document.getElementById("status");
-  status.textContent = "已保存";
-  setTimeout(() => (status.textContent = ""), 1500);
+  try {
+    const values = {};
+    for (const id of ids) {
+      const element = document.getElementById(id);
+      values[id] = element.type === "checkbox" ? element.checked : element.value.trim();
+    }
+    values.fontSize = Number(values.fontSize) || DEFAULTS.fontSize;
+    values.contextLines = Math.max(0, Math.min(8, Number(values.contextLines) || 0));
+    values.outlineWidth = Math.max(0, Math.min(6, Number(values.outlineWidth) || 0));
+    values.backgroundOpacity = Math.max(0, Math.min(100, Number(values.backgroundOpacity) || 0));
+    values.ankiFieldMap = readFieldMap();
+    if (values.ankiEnabled) {
+      validateLocalAddress(values.ankiUrl);
+      if (!values.ankiDeck || !values.ankiModel) throw new Error("请选择默认牌组和笔记类型");
+      if (!values.ankiFieldMap.term || !values.ankiFieldMap.meaning) throw new Error("请映射词语和释义字段");
+      if (values.ankiFieldMap.term === values.ankiFieldMap.meaning) throw new Error("词语和释义不能映射到同一字段");
+    }
+    await chrome.storage.sync.set(values);
+    status.textContent = "已保存";
+    setTimeout(() => (status.textContent = ""), 1500);
+  } catch (error) {
+    status.textContent = `保存失败：${error.message}`;
+  }
 });
 
 document.getElementById("checkService").addEventListener("click", async () => {
@@ -63,6 +82,9 @@ document.getElementById("checkService").addEventListener("click", async () => {
 
 document.getElementById("outlineEnabled").addEventListener("change", syncStyleControls);
 document.getElementById("backgroundEnabled").addEventListener("change", syncStyleControls);
+document.getElementById("ankiEnabled").addEventListener("change", syncAnkiControls);
+document.getElementById("checkAnki").addEventListener("click", () => refreshAnkiMetadata(true));
+document.getElementById("ankiModel").addEventListener("change", refreshAnkiFields);
 
 function syncStyleControls() {
   document.getElementById("outlineColor").disabled = !document.getElementById("outlineEnabled").checked;
@@ -83,3 +105,53 @@ function validateLocalAddress(value) {
     throw new Error("仅支持本机地址：127.0.0.1 或 localhost");
   }
 }
+
+const FIELD_SELECTS = {
+  term: "ankiFieldTerm", meaning: "ankiFieldMeaning", videoSentence: "ankiFieldVideoSentence",
+  generatedExample: "ankiFieldGeneratedExample", exampleTranslation: "ankiFieldExampleTranslation", source: "ankiFieldSource"
+};
+
+function syncAnkiControls() {
+  const enabled = document.getElementById("ankiEnabled").checked;
+  for (const element of document.querySelectorAll("#ankiSettings input, #ankiSettings select, #ankiSettings button")) element.disabled = !enabled;
+}
+
+async function ankiAction(action, params = {}) {
+  const ankiUrl = document.getElementById("ankiUrl").value.trim();
+  const response = await chrome.runtime.sendMessage({ type: "ANKI_ACTION", action, params, ankiUrl });
+  if (!response?.ok) throw new Error(response?.error || "AnkiConnect error");
+  return response.result;
+}
+
+async function refreshAnkiMetadata(showStatus) {
+  if (!document.getElementById("ankiEnabled").checked) return;
+  const status = document.getElementById("ankiStatus");
+  try {
+    if (showStatus) status.textContent = "正在连接…";
+    const [version, decks, models] = await Promise.all([ankiAction("version"), ankiAction("deckNames"), ankiAction("modelNames")]);
+    fillSelect(document.getElementById("ankiDeck"), decks, document.getElementById("ankiDeck").value || DEFAULTS.ankiDeck);
+    fillSelect(document.getElementById("ankiModel"), models, document.getElementById("ankiModel").value || DEFAULTS.ankiModel);
+    await refreshAnkiFields();
+    status.textContent = `AnkiConnect v${version} · ${decks.length} 个牌组`;
+  } catch (error) { if (showStatus) status.textContent = `连接失败：${error.message}`; }
+}
+
+async function refreshAnkiFields() {
+  const modelName = document.getElementById("ankiModel").value;
+  if (!modelName) return;
+  try {
+    const fields = await ankiAction("modelFieldNames", { modelName });
+    const saved = (await chrome.storage.sync.get({ ankiFieldMap: {} })).ankiFieldMap;
+    for (const [key, id] of Object.entries(FIELD_SELECTS)) {
+      const fallback = key === "term" ? fields[0] : key === "meaning" ? fields[1] : "";
+      fillSelect(document.getElementById(id), key === "term" || key === "meaning" ? fields : ["", ...fields], saved[key] || fallback);
+    }
+  } catch (error) { document.getElementById("ankiStatus").textContent = `字段读取失败：${error.message}`; }
+}
+
+function fillSelect(select, values, selected) {
+  select.replaceChildren(...values.map((value) => { const option = document.createElement("option"); option.value = value; option.textContent = value || "不写入"; return option; }));
+  select.value = selected;
+}
+
+function readFieldMap() { return Object.fromEntries(Object.entries(FIELD_SELECTS).map(([key, id]) => [key, document.getElementById(id).value])); }

@@ -18,7 +18,25 @@ Object.assign(I18N.en, {
   "。可修改端口，但服务必须运行在本机，并提供 OpenAI 兼容接口。": ". You may change the port, but the service must run locally and provide an OpenAI-compatible API.",
   "如果未安装 llama.cpp，请按照": "If llama.cpp is not installed, please follow the",
   "安装指南 (README)": "Installation Guide (README)",
-  "进行安装。": "to install it."
+  "进行安装。": "to install it.",
+  "暂停视频后可选择原字幕查词，并按需添加到 Anki。": "Pause the video to select words in the original subtitle and optionally add them to Anki.",
+  "暂停查词与 Anki": "Paused lookup and Anki",
+  "启用暂停查词": "Enable lookup while paused",
+  "视频暂停时选择原字幕中的单词或短语，通过当前本地 AI 服务查看释义和两个例句。": "While paused, select a word or phrase in the original subtitle to see a local-AI definition and two examples.",
+  "启用 Anki 集成": "Enable Anki integration",
+  "AnkiConnect 地址": "AnkiConnect URL",
+  "连接并刷新": "Connect and refresh",
+  "默认牌组": "Default deck",
+  "笔记类型": "Note type",
+  "字段映射": "Field mapping",
+  "词语字段": "Term field",
+  "释义字段": "Meaning field",
+  "视频原句字段": "Video sentence field",
+  "AI 新例句字段": "AI example field",
+  "例句翻译字段": "Example translation field",
+  "来源字段": "Source field",
+  "默认标签": "Default tags",
+  "需安装 AnkiConnect 并保持 Anki Desktop 运行。默认使用一个长期牌组；添加卡片时可以临时切换或手动新建影片子牌组。": "Install AnkiConnect and keep Anki Desktop running. A long-lived default deck is used; you can switch or create a movie subdeck while adding a note."
 });
 
 async function initI18n() {

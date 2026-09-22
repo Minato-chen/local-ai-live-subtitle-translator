@@ -13,7 +13,14 @@ const DEFAULTS = {
   backgroundColor: "#000000",
   backgroundOpacity: 40,
   position: "above",
-  uiLanguage: "zh"
+  uiLanguage: "zh",
+  dictionaryEnabled: true,
+  ankiEnabled: false,
+  ankiUrl: "http://127.0.0.1:8765",
+  ankiDeck: "Default",
+  ankiModel: "Basic",
+  ankiFieldMap: { term: "Front", meaning: "Back", videoSentence: "", generatedExample: "", exampleTranslation: "", source: "" },
+  ankiTags: "subtitle-learning"
 };
 
 const cache = new Map();
@@ -31,6 +38,14 @@ let overlay;
 let translatedLine;
 let sourceLine;
 let statusLine;
+let dictionaryPanel;
+let editorPanel;
+let activeVideo = null;
+let videoPaused = false;
+let lookupRequestId = null;
+let lookupVersion = 0;
+let lastDictionaryEntry = null;
+let sessionDeck = "";
 
 if (isTranslationPage()) init();
 
@@ -59,6 +74,10 @@ async function init() {
   });
 
   window.addEventListener("resize", () => positionOverlay(), { passive: true });
+  document.addEventListener("selectionchange", handleSelectionChange, { passive: true });
+  document.addEventListener("mouseup", handleSelectionMouseUp);
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeInteractivePanels(); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) exitPausedInteraction(); });
   setInterval(scanSubtitles, 500);
   scanSubtitles();
 }
@@ -70,11 +89,15 @@ function createOverlay() {
     <div class="nf-zh-source"></div>
     <div class="nf-zh-translation"></div>
     <div class="nf-zh-status"></div>
+    <section class="nf-zh-dictionary" hidden></section>
+    <section class="nf-zh-anki-editor" hidden></section>
   `;
   document.documentElement.appendChild(overlay);
   sourceLine = overlay.querySelector(".nf-zh-source");
   translatedLine = overlay.querySelector(".nf-zh-translation");
   statusLine = overlay.querySelector(".nf-zh-status");
+  dictionaryPanel = overlay.querySelector(".nf-zh-dictionary");
+  editorPanel = overlay.querySelector(".nf-zh-anki-editor");
   applySettings();
 }
 
@@ -82,7 +105,7 @@ function applySettings() {
   if (!overlay) return;
   overlay.style.setProperty("--nf-zh-font-size", `${Number(settings.fontSize) || 28}px`);
   overlay.classList.toggle("nf-zh-disabled", !settings.enabled);
-  sourceLine.classList.add("nf-zh-hidden");
+  updatePausedUi();
   translatedLine.style.color = settings.textColor || "#ffffff";
   translatedLine.style.webkitTextStroke = settings.outlineEnabled
     ? `${Number(settings.outlineWidth) || 2}px ${settings.outlineColor || "#000000"}`
@@ -126,6 +149,7 @@ function readSubtitle(container) {
 function scanSubtitles() {
   if (extensionContextInvalid) return;
   if (!settings.enabled || !overlay) return;
+  bindPrimaryVideo();
   const container = findSubtitleContainer();
   if (!container) {
     if (lastSource) clearSubtitle();
@@ -327,4 +351,195 @@ function clearSubtitle() {
   sourceLine.textContent = "";
   translatedLine.textContent = "";
   statusLine.textContent = "";
+  closeInteractivePanels();
+}
+
+function findPrimaryVideo() {
+  return [...document.querySelectorAll("video")]
+    .map((video) => ({ video, rect: video.getBoundingClientRect() }))
+    .filter(({ rect }) => rect.width > 0 && rect.height > 0)
+    .sort((a, b) => b.rect.width * b.rect.height - a.rect.width * a.rect.height)[0]?.video || null;
+}
+
+function bindPrimaryVideo() {
+  const next = findPrimaryVideo();
+  if (next === activeVideo) { syncVideoState(); return; }
+  if (activeVideo) {
+    activeVideo.removeEventListener("play", syncVideoState);
+    activeVideo.removeEventListener("pause", syncVideoState);
+    activeVideo.removeEventListener("ended", syncVideoState);
+    activeVideo.removeEventListener("emptied", syncVideoState);
+  }
+  activeVideo = next;
+  if (activeVideo) {
+    activeVideo.addEventListener("play", syncVideoState);
+    activeVideo.addEventListener("pause", syncVideoState);
+    activeVideo.addEventListener("ended", syncVideoState);
+    activeVideo.addEventListener("emptied", syncVideoState);
+  }
+  syncVideoState();
+}
+
+function syncVideoState() {
+  const nextPaused = Boolean(activeVideo && activeVideo.paused && !activeVideo.ended && activeVideo.readyState > 0 && !document.hidden);
+  if (videoPaused === nextPaused) return;
+  videoPaused = nextPaused;
+  if (!videoPaused) exitPausedInteraction();
+  updatePausedUi();
+}
+
+function updatePausedUi() {
+  if (!overlay || !sourceLine) return;
+  const interactive = Boolean(settings.enabled && settings.dictionaryEnabled && videoPaused && lastSource);
+  overlay.classList.toggle("nf-zh-paused", interactive);
+  sourceLine.classList.toggle("nf-zh-hidden", !interactive);
+  if (!interactive) closeInteractivePanels();
+}
+
+function exitPausedInteraction() {
+  videoPaused = false;
+  globalThis.getSelection?.()?.removeAllRanges();
+  closeInteractivePanels();
+}
+
+function selectionBelongsToSource(selection) {
+  if (!selection || selection.rangeCount !== 1 || selection.isCollapsed) return false;
+  const range = selection.getRangeAt(0);
+  return sourceLine.contains(range.commonAncestorContainer);
+}
+
+function handleSelectionChange() {
+  if (!videoPaused && globalThis.getSelection?.()?.rangeCount) globalThis.getSelection().removeAllRanges();
+}
+
+function handleSelectionMouseUp(event) {
+  if (!videoPaused || !settings.dictionaryEnabled || event.target.closest?.(".nf-zh-dictionary, .nf-zh-anki-editor")) return;
+  const selection = globalThis.getSelection?.();
+  if (!selectionBelongsToSource(selection)) return;
+  const term = SubtitleShared.normalizeSelection(selection.toString());
+  if (!term) return;
+  const rect = selection.getRangeAt(0).getBoundingClientRect();
+  requestDictionary(term, lastSource, rect);
+}
+
+function uiText(zh, en) { return settings.uiLanguage === "en" ? en : zh; }
+
+async function requestDictionary(term, sentence, rect) {
+  const version = ++lookupVersion;
+  if (lookupRequestId) chrome.runtime.sendMessage({ type: "CANCEL_LOOKUP", requestId: lookupRequestId }).catch(() => {});
+  lookupRequestId = `lookup-${Date.now()}-${version}`;
+  showDictionaryShell(rect, term, uiText("正在查询…", "Looking up…"));
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, sentence, source: settings.source, target: settings.target });
+    if (version !== lookupVersion || !videoPaused) return;
+    if (!response?.ok) throw new Error(response?.error || uiText("查词失败", "Lookup failed"));
+    lastDictionaryEntry = { ...response.entry, videoSentence: sentence, sourceUrl: location.href, sourceTitle: document.title };
+    renderDictionary(lastDictionaryEntry);
+  } catch (error) {
+    if (version !== lookupVersion || !videoPaused) return;
+    renderPanelMessage(dictionaryPanel, error.message, true);
+  }
+}
+
+function showDictionaryShell(rect, term, message) {
+  editorPanel.hidden = true;
+  dictionaryPanel.hidden = false;
+  dictionaryPanel.replaceChildren();
+  const title = document.createElement("strong"); title.textContent = term;
+  const status = document.createElement("p"); status.textContent = message;
+  dictionaryPanel.append(title, status);
+  const left = Math.max(8, Math.min(window.innerWidth - 340, rect?.left || window.innerWidth / 2 - 160));
+  const top = Math.max(8, Math.min(window.innerHeight - 260, (rect?.bottom || window.innerHeight / 2) + 8));
+  dictionaryPanel.style.left = `${left}px`; dictionaryPanel.style.top = `${top}px`;
+}
+
+function renderDictionary(entry) {
+  dictionaryPanel.replaceChildren();
+  const header = document.createElement("div"); header.className = "nf-zh-panel-header";
+  const word = document.createElement("strong"); word.textContent = entry.term || entry.normalizedTerm;
+  const close = panelButton("×", closeInteractivePanels, "nf-zh-close"); header.append(word, close);
+  dictionaryPanel.append(header);
+  if (entry.pronunciation || entry.partOfSpeech) appendText(dictionaryPanel, [entry.pronunciation, entry.partOfSpeech].filter(Boolean).join(" · "), "nf-zh-meta");
+  for (const definition of entry.definitions || []) appendText(dictionaryPanel, `• ${definition}`);
+  if (entry.contextualMeaning) appendLabeled(dictionaryPanel, uiText("语境释义", "In context"), entry.contextualMeaning);
+  appendLabeled(dictionaryPanel, uiText("视频原句", "Video sentence"), entry.videoSentence);
+  if (entry.generatedExample) appendLabeled(dictionaryPanel, uiText("新例句", "New example"), `${entry.generatedExample}${entry.generatedExampleTranslation ? `\n${entry.generatedExampleTranslation}` : ""}`);
+  if (settings.ankiEnabled) dictionaryPanel.append(panelButton(uiText("添加到 Anki", "Add to Anki"), () => openAnkiEditor(entry), "nf-zh-primary"));
+}
+
+function appendText(parent, text, className = "") { const p = document.createElement("p"); p.className = className; p.textContent = text || ""; parent.append(p); }
+function appendLabeled(parent, label, text) { if (!text) return; const wrap = document.createElement("div"); const strong = document.createElement("b"); strong.textContent = label; const p = document.createElement("p"); p.textContent = text; wrap.append(strong, p); parent.append(wrap); }
+function panelButton(label, handler, className = "") { const button = document.createElement("button"); button.type = "button"; button.className = className; button.textContent = label; button.addEventListener("click", handler); return button; }
+function renderPanelMessage(panel, message, error = false) { panel.replaceChildren(); const p = document.createElement("p"); p.className = error ? "nf-zh-error" : ""; p.textContent = message; panel.append(p, panelButton("×", closeInteractivePanels, "nf-zh-close")); }
+
+async function openAnkiEditor(entry) {
+  if (!videoPaused) return;
+  dictionaryPanel.hidden = true; editorPanel.hidden = false; editorPanel.replaceChildren();
+  const heading = document.createElement("div"); heading.className = "nf-zh-panel-header";
+  const title = document.createElement("strong"); title.textContent = uiText("添加到 Anki", "Add to Anki"); heading.append(title, panelButton("×", closeInteractivePanels, "nf-zh-close")); editorPanel.append(heading);
+  const deck = addEditorField("deck", uiText("牌组", "Deck"), sessionDeck || settings.ankiDeck, "select");
+  const fields = {
+    term: addEditorField("term", uiText("词语", "Term"), entry.term || entry.normalizedTerm),
+    meaning: addEditorField("meaning", uiText("释义", "Meaning"), entry.contextualMeaning || (entry.definitions || []).join("；"), "textarea"),
+    videoSentence: addEditorField("videoSentence", uiText("视频原句", "Video sentence"), entry.videoSentence, "textarea"),
+    generatedExample: addEditorField("generatedExample", uiText("新例句", "New example"), entry.generatedExample, "textarea"),
+    exampleTranslation: addEditorField("exampleTranslation", uiText("例句翻译", "Example translation"), entry.generatedExampleTranslation, "textarea"),
+    source: addEditorField("source", uiText("来源", "Source"), `${entry.sourceTitle}\n${entry.sourceUrl}`, "textarea"),
+    tags: addEditorField("tags", uiText("标签", "Tags"), [settings.ankiTags, ...SubtitleShared.sourceTags(entry.sourceTitle, location.hostname)].filter(Boolean).join(" "))
+  };
+  const newDeck = panelButton(uiText("新建牌组", "New deck"), () => createDeckFromEditor(deck), "nf-zh-secondary");
+  const submit = panelButton(uiText("确认添加", "Confirm add"), () => submitAnkiNote(deck, fields, submit), "nf-zh-primary");
+  editorPanel.append(newDeck, submit);
+  try {
+    const decks = await ankiAction("deckNames");
+    deck.replaceChildren(...decks.map((name) => { const option = document.createElement("option"); option.value = option.textContent = name; return option; }));
+    deck.value = sessionDeck || settings.ankiDeck;
+    if (!deck.value && decks[0]) deck.value = decks[0];
+  } catch (error) { renderEditorStatus(error.message, true); }
+}
+
+function addEditorField(name, labelText, value, kind = "input") {
+  const label = document.createElement("label"); label.textContent = labelText;
+  const field = kind === "textarea" ? document.createElement("textarea") : kind === "select" ? document.createElement("select") : document.createElement("input");
+  field.name = name; if (kind !== "select") field.value = value || ""; label.append(field); editorPanel.append(label); return field;
+}
+
+async function createDeckFromEditor(deckSelect) {
+  const name = prompt(uiText("请输入新牌组名称，例如 Subtitle Learning::影片名", "Enter a new deck name, e.g. Subtitle Learning::Movie"));
+  if (!name?.trim()) return;
+  try { await ankiAction("createDeck", { deck: name.trim() }); const option = document.createElement("option"); option.value = option.textContent = name.trim(); deckSelect.append(option); deckSelect.value = name.trim(); renderEditorStatus(uiText("牌组已创建", "Deck created")); } catch (error) { renderEditorStatus(error.message, true); }
+}
+
+async function submitAnkiNote(deck, fields, button) {
+  if (button.disabled) return; button.disabled = true;
+  try {
+    const values = Object.fromEntries(Object.entries(fields).filter(([key]) => key !== "tags").map(([key, field]) => [key, field.value]));
+    const tags = fields.tags.value.split(/\s+/).filter(Boolean);
+    const note = AnkiLib.buildNote({ deckName: deck.value, modelName: settings.ankiModel, fieldMap: settings.ankiFieldMap, values, tags });
+    const canAdd = await ankiAction("canAddNotes", { notes: [note] });
+    if (!canAdd?.[0]) throw new Error(uiText("该卡片可能重复或字段无效", "The note may be a duplicate or invalid"));
+    const noteId = await ankiAction("addNote", { note });
+    sessionDeck = deck.value;
+    renderPanelMessage(editorPanel, uiText(`已添加到 Anki（${noteId}）`, `Added to Anki (${noteId})`));
+  } catch (error) { renderEditorStatus(error.message, true); button.disabled = false; }
+}
+
+async function ankiAction(action, params = {}) {
+  const response = await chrome.runtime.sendMessage({ type: "ANKI_ACTION", action, params, ankiUrl: settings.ankiUrl });
+  if (!response?.ok) throw new Error(response?.error || "AnkiConnect error");
+  return response.result;
+}
+
+function renderEditorStatus(message, error = false) {
+  let status = editorPanel.querySelector(".nf-zh-editor-status");
+  if (!status) { status = document.createElement("p"); status.className = "nf-zh-editor-status"; editorPanel.append(status); }
+  status.classList.toggle("nf-zh-error", error); status.textContent = message;
+}
+
+function closeInteractivePanels() {
+  lookupVersion++;
+  if (lookupRequestId) chrome.runtime?.sendMessage?.({ type: "CANCEL_LOOKUP", requestId: lookupRequestId }).catch(() => {});
+  lookupRequestId = null; lastDictionaryEntry = null;
+  if (dictionaryPanel) { dictionaryPanel.hidden = true; dictionaryPanel.replaceChildren(); }
+  if (editorPanel) { editorPanel.hidden = true; editorPanel.replaceChildren(); }
 }

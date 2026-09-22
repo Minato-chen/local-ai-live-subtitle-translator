@@ -1,11 +1,16 @@
+importScripts("lib/shared.js", "lib/dictionary.js", "lib/anki.js");
+
 const DEFAULTS = {
   source: "auto",
   target: "zh",
   timeoutMs: 12000,
-  serviceUrl: "http://127.0.0.1:8080"
+  serviceUrl: "http://127.0.0.1:8080",
+  ankiUrl: "http://127.0.0.1:8765"
 };
 
 const activeTranslations = new Map();
+const activeLookups = new Map();
+const dictionaryCache = new Map();
 const modelCache = new Map();
 const ICONS = {
   idle: { 16: "icons/icon-idle-16.png", 32: "icons/icon-idle-32.png", 48: "icons/icon-idle-48.png", 128: "icons/icon-idle-128.png" },
@@ -52,6 +57,29 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 
+  if (message?.type === "LOOKUP_WORD") {
+    const controller = new AbortController();
+    if (message.requestId) activeLookups.set(message.requestId, controller);
+    lookupWord(message, controller.signal)
+      .then((entry) => sendResponse({ ok: true, entry }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }))
+      .finally(() => { if (message.requestId) activeLookups.delete(message.requestId); });
+    return true;
+  }
+
+  if (message?.type === "CANCEL_LOOKUP") {
+    activeLookups.get(message.requestId)?.abort();
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (message?.type === "ANKI_ACTION") {
+    invokeAnki(message.action, message.params, message.ankiUrl)
+      .then((result) => sendResponse({ ok: true, result }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
   if (message?.type === "CHECK_SERVICE") {
     checkService(message.serviceUrl)
       .then((result) => sendResponse({ ok: true, ...result }))
@@ -65,6 +93,42 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 async function translate(text, context, signal) {
   const settings = await chrome.storage.sync.get(DEFAULTS);
   return translateWithLlamaCpp(text, context, settings, signal);
+}
+
+async function lookupWord(message, signal) {
+  const settings = await chrome.storage.sync.get(DEFAULTS);
+  const term = SubtitleShared.normalizeSelection(message.term);
+  if (!term) throw new Error("请选择不超过 80 个字符的单词或短语");
+  const sentence = String(message.sentence || "").trim().slice(0, 500);
+  const cacheKey = JSON.stringify([settings.serviceUrl, message.source, message.target, term, sentence]);
+  if (dictionaryCache.has(cacheKey)) return dictionaryCache.get(cacheKey);
+  const model = await discoverModel(settings.serviceUrl);
+  const messages = DictionaryLib.buildDictionaryMessages({ term, sentence, source: message.source, target: message.target });
+  const entry = await fetchWithTimeout(serviceEndpoint(settings.serviceUrl, "/v1/chat/completions"), settings.timeoutMs, {
+    model, stream: false, temperature: 0.1, max_tokens: 500, messages
+  }, DictionaryLib.parseDictionaryResponse, signal);
+  if (!entry.term) entry.term = term;
+  dictionaryCache.set(cacheKey, entry);
+  if (dictionaryCache.size > 200) dictionaryCache.delete(dictionaryCache.keys().next().value);
+  return entry;
+}
+
+const ANKI_ACTIONS = new Set(["version", "deckNames", "createDeck", "modelNames", "modelFieldNames", "canAddNotes", "addNote"]);
+async function invokeAnki(action, params = {}, explicitUrl) {
+  if (!ANKI_ACTIONS.has(action)) throw new Error("不支持的 Anki 操作");
+  const settings = await chrome.storage.sync.get(DEFAULTS);
+  const url = SubtitleShared.validateLoopbackHttpUrl(explicitUrl || settings.ankiUrl, DEFAULTS.ankiUrl);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(AnkiLib.requestBody(action, params)), signal: controller.signal });
+    if (!response.ok) throw new Error(`AnkiConnect 返回 HTTP ${response.status}`);
+    return AnkiLib.parseResponse(await response.json());
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error("AnkiConnect 请求超时");
+    if (error.name === "TypeError") throw new Error("无法连接 AnkiConnect，请确认 Anki 已启动并安装插件");
+    throw error;
+  } finally { clearTimeout(timer); }
 }
 
 async function translateWithLlamaCpp(text, context, settings, signal) {
