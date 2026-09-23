@@ -139,3 +139,12 @@
 - Space-delimited Latin-script subtitles now render as visually unchanged clickable word blocks while paused; a click selects a whole word and a drag selects a continuous block range.
 - CJK subtitles retain native selection. Playback still hides the source line and disables lookup interaction.
 - Regression suite: 26/26 tests passing, including tokenization and phrase-range checks; JavaScript syntax and diff checks pass. Manual player interaction remains to be verified.
+
+## Review fixes — Card validation and lookup quality
+
+- Reject Basic cards whose definition is empty even if part of speech is present.
+- Keep the user's selected surface form (for example `kept`) as the displayed term and Anki front; retain model normalization separately.
+- Propagate Anki field/template lookup failures, validate the Basic template before reporting connection success, and require a refresh after changing the Anki URL.
+- Match generated examples against whole words or contiguous phrase tokens instead of substrings.
+- When definitions fail quality checks, use a concise contextual meaning if valid; otherwise request one short meaning for the selected text within its sentence, rejecting sentence-like output.
+- Regression suite: 30/30 tests passing, JavaScript syntax and diff checks pass. Live model and Anki interactions remain manual checks.

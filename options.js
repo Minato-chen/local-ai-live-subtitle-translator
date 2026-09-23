@@ -23,6 +23,7 @@ const DEFAULTS = {
 const ids = Object.keys(DEFAULTS);
 let loadedSettings = { ...DEFAULTS };
 let currentAnkiTemplateFields = null;
+let currentAnkiMetadataUrl = "";
 
 document.addEventListener("DOMContentLoaded", async () => {
   await initI18n();
@@ -55,7 +56,7 @@ document.getElementById("save").addEventListener("click", async () => {
     if (values.ankiEnabled) {
       validateLocalAddress(values.ankiUrl);
       if (!values.ankiDeck) throw new Error("请选择默认牌组");
-      if (!currentAnkiTemplateFields) throw new Error("请先连接 Anki，读取卡片模板后再保存");
+      if (!currentAnkiTemplateFields || currentAnkiMetadataUrl !== values.ankiUrl) throw new Error("请先连接当前 Anki 地址并读取卡片模板");
       if (!Object.values(currentAnkiTemplateFields).some((sides) => sides?.[0]?.includes("Front") && sides?.[1]?.includes("Back"))) {
         throw new Error("Basic 模板未在正反面显示 Front 和 Back 字段");
       }
@@ -127,6 +128,8 @@ async function ankiAction(action, params = {}) {
 async function refreshAnkiMetadata(showStatus) {
   if (!document.getElementById("ankiEnabled").checked) return;
   const status = document.getElementById("ankiStatus");
+  currentAnkiTemplateFields = null;
+  currentAnkiMetadataUrl = "";
   try {
     if (showStatus) status.textContent = "正在连接…";
     const permission = await ankiAction("requestPermission");
@@ -145,20 +148,22 @@ async function refreshAnkiMetadata(showStatus) {
     if (!modelSelect.value) throw new Error("未找到 Basic 笔记类型，请在 Anki 中恢复或创建 Basic");
     await refreshAnkiFields();
     status.textContent = `AnkiConnect v${version} · ${decks.length} 个牌组`;
-  } catch (error) { if (showStatus) status.textContent = `连接失败：${error.message}`; }
+  } catch (error) { status.textContent = `连接失败：${error.message}`; }
 }
 
 async function refreshAnkiFields() {
   currentAnkiTemplateFields = null;
   if (document.getElementById("ankiModel").value !== "Basic") return;
-  try {
-    const [fields, templates] = await Promise.all([
-      ankiAction("modelFieldNames", { modelName: "Basic" }),
-      ankiAction("modelFieldsOnTemplates", { modelName: "Basic" })
-    ]);
-    if (!fields.includes("Front") || !fields.includes("Back")) throw new Error("Basic 缺少 Front 或 Back 字段");
-    currentAnkiTemplateFields = templates;
-  } catch (error) { currentAnkiTemplateFields = null; document.getElementById("ankiStatus").textContent = `字段读取失败：${error.message}`; }
+  const [fields, templates] = await Promise.all([
+    ankiAction("modelFieldNames", { modelName: "Basic" }),
+    ankiAction("modelFieldsOnTemplates", { modelName: "Basic" })
+  ]);
+  if (!fields.includes("Front") || !fields.includes("Back")) throw new Error("Basic 缺少 Front 或 Back 字段");
+  if (!Object.values(templates || {}).some((sides) => sides?.[0]?.includes("Front") && sides?.[1]?.includes("Back"))) {
+    throw new Error("Basic 模板未在正反面显示 Front 和 Back 字段");
+  }
+  currentAnkiTemplateFields = templates;
+  currentAnkiMetadataUrl = document.getElementById("ankiUrl").value.trim();
 }
 
 function fillSelect(select, values, selected) {

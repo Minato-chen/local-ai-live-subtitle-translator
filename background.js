@@ -140,7 +140,8 @@ async function lookupWord(message, signal) {
   }
   await repairGeneratedExample(entry, { term, sentence, source: message.source, target: message.target, settings, signal });
   await repairDictionaryQuality(entry, { term, sentence, source: message.source, target: message.target, settings, signal });
-  if (!entry.term) entry.term = term;
+  // The model may return a lemma such as "keep" for a selected form "kept".
+  entry = DictionaryLib.preserveSelectedTerm(entry, term);
   dictionaryCache.set(cacheKey, entry);
   if (dictionaryCache.size > 200) dictionaryCache.delete(dictionaryCache.keys().next().value);
   if (!videoSentenceTranslation && sentence) videoSentenceTranslation = await translateWithLlamaCpp(sentence, [], settings, signal);
@@ -165,7 +166,7 @@ async function repairGeneratedExample(entry, { term, sentence, source, target, s
   const repaired = await translateWithLlamaCpp(targetExample, [], {
     ...settings, source: resolvedTarget, target: resolvedSource
   }, signal);
-  if (!DictionaryLib.isLanguagePlausible(repaired, resolvedSource)) {
+  if (!DictionaryLib.isLanguagePlausible(repaired, resolvedSource) || !DictionaryLib.containsQueryTerm(repaired, term)) {
     entry.generatedExample = ""; entry.generatedExampleTranslation = ""; return;
   }
   entry.generatedExample = repaired;
@@ -177,12 +178,18 @@ async function repairDictionaryQuality(entry, { term, sentence, source, target, 
   const sourceLanguage = DictionaryLib.inferSourceLanguage(source, sentence);
   if (!DictionaryLib.isPlausiblePronunciation(entry.pronunciation)) entry.pronunciation = "";
   if (DictionaryLib.needsDefinitionRepair(entry, targetLanguage)) {
-    try {
-      const translated = await translateWithLlamaCpp(term, [], {
-        ...settings, source: sourceLanguage, target: targetLanguage
-      }, signal);
-      entry.definitions = DictionaryLib.isConciseDefinition(translated, targetLanguage) ? [translated] : [];
-    } catch (error) { if (signal.aborted) throw error; entry.definitions = []; }
+    if (DictionaryLib.isConciseDefinition(entry.contextualMeaning, targetLanguage)) {
+      entry.definitions = [entry.contextualMeaning];
+    } else {
+      try {
+        const model = await discoverModel(settings.serviceUrl);
+        const meaning = await fetchWithTimeout(serviceEndpoint(settings.serviceUrl, "/v1/chat/completions"), settings.timeoutMs, {
+          model, stream: false, temperature: 0, max_tokens: 80,
+          messages: DictionaryLib.buildContextMeaningMessages({ term, sentence, target: targetLanguage })
+        }, cleanOpenAiResponse, signal);
+        entry.definitions = DictionaryLib.isConciseDefinition(meaning, targetLanguage) ? [meaning] : [];
+      } catch (error) { if (signal.aborted) throw error; entry.definitions = []; }
+    }
   } else {
     entry.definitions = entry.definitions.filter((value) => DictionaryLib.isConciseDefinition(value, targetLanguage));
   }
@@ -198,7 +205,7 @@ async function repairDictionaryQuality(entry, { term, sentence, source, target, 
           { role: "user", content: term }
         ]
       }, cleanOpenAiResponse, signal);
-      if (candidate.toLocaleLowerCase().includes(term.toLocaleLowerCase()) &&
+      if (DictionaryLib.containsQueryTerm(candidate, term) &&
           DictionaryLib.isLanguagePlausible(candidate, sourceLanguage) &&
           !DictionaryLib.sameExample(candidate, sentence)) entry.generatedExample = candidate;
     } catch (error) { if (signal.aborted) throw error; }
