@@ -160,3 +160,11 @@
 - Native selections for non-space-delimited subtitles require confirmation of the exact text and word/phrase type before lookup.
 - Short phrases cannot cross clear sentence punctuation; long phrases are rejected. Sentence grammar parsing and sentence cards are deferred.
 - Dictionary requests now distinguish words from phrases. Optional model-provided word-form notes can appear in the dictionary and Basic card back; uncertain notes are omitted.
+
+## Language-specific dictionary pass — Japanese first
+
+- Split English, Chinese, and Japanese lookup guidance and output checks into separate language profiles so future language tuning does not alter unrelated rules.
+- Japanese now prompts for 辞書形, 丁寧形, verb groups, causative/passive forms, and kana readings; context retries also preserve Japanese form context.
+- Suppress conjugation notes on Japanese nouns, including the reported false “past tense” for お父さん. Japanese examples must look like complete Japanese sentences; kanji-only terms remain valid for lookup.
+- Tests: 37/37 passing; JavaScript syntax and diff checks pass. Live Japanese model accuracy still requires manual review. Kanji-only Japanese needs explicit source-language selection because automatic script detection is ambiguous.
+- Next: manually test Japanese noun/verb examples with the configured local model and refine only the Japanese profile based on observed failures.

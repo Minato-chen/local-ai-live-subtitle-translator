@@ -1,4 +1,4 @@
-importScripts("lib/shared.js", "lib/dictionary.js", "lib/anki.js");
+importScripts("lib/shared.js", "lib/languages/en.js", "lib/languages/zh.js", "lib/languages/ja.js", "lib/languages/index.js", "lib/dictionary.js", "lib/anki.js");
 
 const DEFAULTS = {
   source: "auto",
@@ -170,7 +170,7 @@ async function repairGeneratedExample(entry, { term, sentence, source, target, s
   const repaired = await translateWithLlamaCpp(targetExample, [], {
     ...settings, source: resolvedTarget, target: resolvedSource
   }, signal);
-  if (!DictionaryLib.isLanguagePlausible(repaired, resolvedSource) || !DictionaryLib.containsQueryTerm(repaired, term)) {
+  if (!DictionaryLib.isExamplePlausible(repaired, resolvedSource) || !DictionaryLib.containsQueryTerm(repaired, term)) {
     entry.generatedExample = ""; entry.generatedExampleTranslation = ""; return;
   }
   entry.generatedExample = repaired;
@@ -180,7 +180,8 @@ async function repairGeneratedExample(entry, { term, sentence, source, target, s
 async function repairDictionaryQuality(entry, { term, sentence, source, target, kind, settings, signal }) {
   const targetLanguage = target || settings.target || "zh";
   const sourceLanguage = DictionaryLib.inferSourceLanguage(source, sentence);
-  if (!DictionaryLib.isPlausiblePronunciation(entry.pronunciation)) entry.pronunciation = "";
+  Object.assign(entry, DictionaryLib.sanitizeWordForm(entry, term, sourceLanguage));
+  if (!DictionaryLib.isPlausiblePronunciation(entry.pronunciation, sourceLanguage)) entry.pronunciation = "";
   if (kind === "phrase") {
     entry.pronunciation = ""; entry.partOfSpeech = ""; entry.formNote = ""; entry.normalizedTerm = term;
   } else if (!entry.normalizedTerm || entry.normalizedTerm.toLocaleLowerCase() === term.toLocaleLowerCase() ||
@@ -195,7 +196,7 @@ async function repairDictionaryQuality(entry, { term, sentence, source, target, 
         const model = await discoverModel(settings.serviceUrl);
         const meaning = await fetchWithTimeout(serviceEndpoint(settings.serviceUrl, "/v1/chat/completions"), settings.timeoutMs, {
           model, stream: false, temperature: 0, max_tokens: 80,
-          messages: DictionaryLib.buildContextMeaningMessages({ term, sentence, target: targetLanguage })
+          messages: DictionaryLib.buildContextMeaningMessages({ term, sentence, source: sourceLanguage, target: targetLanguage })
         }, cleanOpenAiResponse, signal);
         entry.definitions = DictionaryLib.isConciseDefinition(meaning, targetLanguage) ? [meaning] : [];
       } catch (error) { if (signal.aborted) throw error; entry.definitions = []; }
@@ -216,7 +217,7 @@ async function repairDictionaryQuality(entry, { term, sentence, source, target, 
         ]
       }, cleanOpenAiResponse, signal);
       if (DictionaryLib.containsQueryTerm(candidate, term) &&
-          DictionaryLib.isLanguagePlausible(candidate, sourceLanguage) &&
+          DictionaryLib.isExamplePlausible(candidate, sourceLanguage) &&
           !DictionaryLib.sameExample(candidate, sentence)) entry.generatedExample = candidate;
     } catch (error) { if (signal.aborted) throw error; }
   }
