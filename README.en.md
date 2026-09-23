@@ -50,7 +50,7 @@ The settings page has three sections:
 
 ## Lookup While Paused
 
-Enable paused lookup, then pause a video to reveal the current original subtitle retained by the extension. Click whole-word blocks or drag across them for space-delimited subtitles; Japanese, Chinese, and similar subtitles use native text selection. Lookup starts immediately without a word/phrase type choice. Every result shows a short contextual meaning (with a brief usage note when needed), the video sentence, and its translation. It does not generate a new example or show part of speech, base form, or grammar analysis. Cross-sentence and overly long selections are rejected. Playback, Escape, or a subtitle change closes the panel. No lookup request is made while the video is playing.
+Enable paused lookup, then pause a video to reveal the current original subtitle retained by the extension. Click whole-word blocks or drag across them for space-delimited subtitles; Japanese, Chinese, and similar subtitles use native text selection. Lookup starts immediately without a word/phrase type choice. Results use a light dictionary format with one or two concise senses, followed by the video sentence and its translation. No new example or word-form explanation is generated. Cross-sentence and overly long selections are rejected. Playback, Escape, or a subtitle change closes the panel. No lookup request is made while the video is playing.
 
 AI meanings are learning aids rather than authoritative dictionary entries. The extension checks only for short target-language text, not semantic accuracy; review notes before adding them to Anki. Lookup text is sent only to the configured local OpenAI-compatible service.
 

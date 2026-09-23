@@ -24,6 +24,7 @@ const DEFAULTS = {
 };
 
 const cache = new Map();
+const fragmentTranslationCache = new Map();
 const subtitleHistory = [];
 let settings = { ...DEFAULTS };
 let lastSource = "";
@@ -50,8 +51,17 @@ let sessionDeck = "";
 let dictionaryAnchor = null;
 let wordBlockParts = null;
 let blockDrag = null;
+let lastPageKey = "";
 
 if (isTranslationPage()) init();
+else {
+  const navigationObserver = new MutationObserver(() => {
+    if (!isTranslationPage()) return;
+    navigationObserver.disconnect();
+    init();
+  });
+  navigationObserver.observe(document.documentElement, { childList: true, subtree: true });
+}
 
 function isTranslationPage() {
   const host = location.hostname;
@@ -62,10 +72,12 @@ function isTranslationPage() {
 
 async function init() {
   settings = await chrome.storage.sync.get(DEFAULTS);
+  lastPageKey = location.pathname + location.search;
   createOverlay();
   chrome.storage.onChanged.addListener((changes) => {
     for (const [key, value] of Object.entries(changes)) settings[key] = value.newValue;
     cache.clear();
+    fragmentTranslationCache.clear();
     subtitleHistory.length = 0;
     applySettings();
     scanSubtitles();
@@ -154,6 +166,19 @@ function readSubtitle(container) {
 function scanSubtitles() {
   if (extensionContextInvalid) return;
   if (!settings.enabled || !overlay) return;
+  const pageKey = location.pathname + location.search;
+  if (pageKey !== lastPageKey) {
+    lastPageKey = pageKey;
+    if (lastSource) clearSubtitle();
+    subtitleHistory.length = 0;
+    cache.clear();
+    fragmentTranslationCache.clear();
+    return;
+  }
+  if (!isTranslationPage()) {
+    if (lastSource) clearSubtitle();
+    return;
+  }
   bindPrimaryVideo();
   const container = findSubtitleContainer();
   if (!container) {
@@ -255,12 +280,6 @@ function showTranslation(text, version) {
   if (version !== requestVersion) return;
   translatedSource = lastSource;
   translatedLine.textContent = text;
-  if (lastDictionaryEntry?.videoSentence === lastSource && !lastDictionaryEntry.videoSentenceTranslation) {
-    lastDictionaryEntry.videoSentenceTranslation = text;
-    if (dictionaryPanel && !dictionaryPanel.hidden) renderDictionary(lastDictionaryEntry);
-    const editorTranslation = editorPanel?.querySelector('[name="videoTranslation"]');
-    if (editorTranslation && !editorTranslation.value) editorTranslation.value = text;
-  }
   statusLine.textContent = "";
   positionOverlay();
 }
@@ -350,7 +369,17 @@ function positionYouTubeOverlay(player) {
     return;
   }
   if (settings.position === "bottom") {
-    overlay.style.bottom = `${Math.max(8, viewportHeight - rect.bottom + padding)}px`;
+    const visibleCaptionBounds = (selector) => [...player.querySelectorAll(selector)]
+      .filter((node) => node.textContent.trim())
+      .map((node) => node.getBoundingClientRect())
+      .filter((bounds) => bounds.height > 0 && bounds.bottom > rect.top && bounds.top < rect.bottom);
+    const captionBounds = visibleCaptionBounds(".caption-window");
+    if (!captionBounds.length) captionBounds.push(...visibleCaptionBounds(".ytp-caption-segment"));
+    const captionRect = captionBounds.length
+      ? { top: Math.min(...captionBounds.map((bounds) => bounds.top)), bottom: Math.max(...captionBounds.map((bounds) => bounds.bottom)) }
+      : null;
+    const height = overlay.getBoundingClientRect().height;
+    overlay.style.top = `${SubtitleShared.computeCaptionSafeTop(rect, captionRect, height, viewportHeight, padding)}px`;
     return;
   }
 
@@ -527,24 +556,52 @@ async function requestDictionary(term, sentence, rect, kind = "word") {
   lookupRequestId = `lookup-${Date.now()}-${version}`;
   showDictionaryShell(rect, term, uiText("正在查询…", "Looking up…"));
   try {
-    const visibleTranslation = translatedLine.textContent.trim();
-    const videoSentenceTranslation = translatedSource === sentence && visibleTranslation && visibleTranslation !== "..." ? visibleTranslation : "";
     const context = subtitleHistory.slice(0, -1).slice(-8);
-    const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, sentence, context, videoSentenceTranslation, source: settings.source, target: settings.target });
+    const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, sentence, context, source: settings.source, target: settings.target });
     if (version !== lookupVersion || !videoPaused) return;
     if (!response?.ok) throw new Error(response?.error || uiText("查词失败", "Lookup failed"));
-    if (!response.entry.videoSentenceTranslation && translatedSource === sentence) {
-      response.entry.videoSentenceTranslation = translatedLine.textContent.trim();
-    }
     lastDictionaryEntry = {
       ...response.entry,
       videoSentence: sentence,
+      videoSentenceTranslation: "",
       sourceTitle: document.title
     };
     renderDictionary(lastDictionaryEntry);
+    await translateDictionaryFragment(lastDictionaryEntry, version);
   } catch (error) {
     if (version !== lookupVersion || !videoPaused) return;
     renderPanelMessage(dictionaryPanel, error.message, true);
+  }
+}
+
+async function translateDictionaryFragment(entry, version) {
+  const sentence = entry.videoSentence;
+  const key = JSON.stringify([settings.serviceUrl, settings.source, settings.target, sentence]);
+  try {
+    let translation = fragmentTranslationCache.get(key);
+    if (!translation) {
+      const response = await chrome.runtime.sendMessage({
+        type: "TRANSLATE_FRAGMENT", text: sentence, source: settings.source, target: settings.target
+      });
+      if (!response?.ok) throw new Error(response?.error || "片段翻译失败");
+      translation = response.translatedText;
+      fragmentTranslationCache.set(key, translation);
+      if (fragmentTranslationCache.size > 200) fragmentTranslationCache.delete(fragmentTranslationCache.keys().next().value);
+    }
+    if (version !== lookupVersion || !videoPaused || lastDictionaryEntry !== entry) return;
+    entry.videoSentenceTranslation = translation;
+    if (!dictionaryPanel.hidden) renderDictionary(entry);
+    const editorTranslation = editorPanel?.querySelector('[name="videoTranslation"]');
+    if (editorTranslation && !editorTranslation.value) editorTranslation.value = translation;
+  } catch (error) {
+    if (version !== lookupVersion || lastDictionaryEntry !== entry) return;
+    if (!dictionaryPanel.hidden) {
+      const note = document.createElement("p");
+      note.className = "nf-zh-error";
+      note.textContent = uiText("片段译文暂不可用，可手动编辑 Anki 卡片", "Fragment translation unavailable; you can edit the Anki card");
+      dictionaryPanel.append(note);
+      positionDictionaryPanel();
+    }
   }
 }
 
@@ -567,7 +624,7 @@ function renderDictionary(entry) {
   const word = document.createElement("strong"); word.textContent = entry.term;
   const close = panelButton("×", closeInteractivePanels, "nf-zh-close"); header.append(word, close);
   dictionaryPanel.append(header);
-  appendText(dictionaryPanel, entry.meaning);
+  appendLabeled(dictionaryPanel, uiText("释义", "Meaning"), entry.meaning);
   appendBilingualExample(dictionaryPanel, uiText("视频原句", "Video sentence"), entry.videoSentence, entry.videoSentenceTranslation);
   dictionaryPanel.append(panelButton(
     settings.ankiEnabled ? uiText("添加到 Anki", "Add to Anki") : uiText("设置 Anki", "Set up Anki"),

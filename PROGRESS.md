@@ -210,3 +210,65 @@
 - Replaced the dictionary-shaped JSON request with one short plain-text meaning request for both words and phrases. Removed AI type classification, part of speech, base form, pronunciation, and grammar repair from new results.
 - Lookup and Anki now use only selected text, contextual meaning (including a short explanation when needed), video sentence, and its translation. Existing Anki notes remain untouched.
 - Retained native-script source inference and selection length/boundary checks. Tests and syntax checks pass; live model evaluation remains manual.
+
+## Light dictionary-style formatting
+
+- The plain-text meaning prompt now uses a stable contract: `释义：` with one or two concise senses, followed only when a reliable inflection is detected by `词形：选中形式 → 原形（变化类型）`.
+- Contextual “说明” text is no longer requested or displayed. The lookup panel and Anki editor keep only meaning, optional form note, video sentence, and translation.
+- Tests: 25/25 passing; syntax and diff checks pass.
+
+## Invalidate stale dictionary results
+
+- Bumped the in-memory dictionary cache version after tightening word-form validation, so results produced by an older background worker are not reused after the extension reloads.
+- Existing browser workers still need one extension reload; no stored user data is changed.
+
+## UI-level word-form safety check
+
+- The dictionary panel and Anki editor now independently suppress invalid word-form notes, including same-form annotations and leaked translations, even if an old or malformed background response reaches the content script.
+
+## Keep valid English and Japanese form explanations visible
+
+- Fixed the final display check so Chinese change labels such as `（过去式）` no longer make an English lemma look like a Chinese translation. `kept → keep（过去式）` and Japanese inflections remain visible; translated or unchanged lemmas remain hidden.
+- Added a regression test for the shared display check. Tests: 26/26 passing; live model verification remains pending because no service is listening on `127.0.0.1:8080`.
+
+## Remove the optional explanation
+
+- Removed the second explanation line from the lookup prompt, parser output, dictionary panel, Anki editor, and generated Basic card back. The lookup now returns only concise meaning plus the existing video sentence and translation.
+- Legacy model responses containing an explanation line keep the meaning but discard the extra line. The dictionary cache version changed so older entries are not reused after reloading the extension.
+
+## Japanese headword lookup
+
+- A short Japanese selection such as `そこら` is now sent to the model as the headword without the full subtitle, preventing the subtitle's comparative sentence from being mistaken for the selected word's definition. Longer selections retain the subtitle for disambiguation.
+- Japanese lookup instructions now explicitly require the selected expression's own common meaning. Cache version changed so old results are not reused after extension reload. Regression tests: 26/26 passing. Live model behavior remains unverified because the local service is not running.
+
+## Review findings addressed
+
+- Content scripts now initialize after navigation into a supported playback page and clear subtitle context and translation cache when the playback URL changes.
+- Model discovery now honors cancellation and a timeout through both the network request and response-body read, so a stalled model list cannot hold the translation queue indefinitely.
+- Short Japanese headword results that look like sentence-length explanations trigger one focused retry; repeated low-quality results show an error instead of becoming a dictionary entry or Anki card.
+- Settings and background requests now enforce the same loopback HTTP restriction for the AI service address.
+- Regression coverage: 32/32 passing; syntax and diff checks pass. Live browser and model verification remain pending because the local AI service is not running.
+
+## Dictionary response recovery
+
+- The meaning parser now accepts common one-line model variations: Markdown bullets or bold labels, labels separated from their value by a newline, a selected-word prefix, harmless trailing JSON commas, and parenthetical source-language text after a Chinese definition.
+- If the first model answer is still unusable, lookup performs one shorter term-only retry. If both responses fail, it shows a specific retry message instead of silently accepting invalid content. The dictionary cache version was bumped so older results are not reused.
+- Automated tests: 33/33 passing; syntax and diff checks pass. The local AI service was not running, so live model output remains unverified.
+
+## Translation prompt echo and YouTube caption avoidance
+
+- Subtitle translation now detects when the local model echoes internal prompt labels and retries once with a minimal translation request. Repeated prompt echo becomes an error rather than appearing as oversized subtitles.
+- YouTube's bottom placement now measures the current visible native caption bounds, including multiple lines, and moves the overlay above captions as they shift with player controls.
+- Regression tests cover the prompt-echo retry and moving-caption geometry. Tests: 35/35 passing; live player/model verification remains pending.
+
+## Dictionary fragment translation separated from playback
+
+- Kept playback subtitle translation unchanged, including its optional prior-subtitle context.
+- Dictionary cards now request a separate translation of only the displayed current subtitle fragment. They show the meaning immediately, then fill the fragment translation and any open Anki editor when ready. Failed fragment translation leaves the card usable and the Anki translation editable.
+- The fragment translation cache is separate from the playback cache and is cleared when settings or video page changes. Automated tests: 37/37 passing; syntax and diff checks pass. Live model/browser behavior remains to be verified.
+
+## Prevent false word-form notes
+
+- Word-form notes are now tied to the actual selected text, require a genuinely different base form, and reject punctuation/separator patterns that indicate the model placed a translation or multiple meanings after the arrow.
+- Same-form annotations such as `結果 → 結果（名词）` and meaning leakage such as `求めて → 追求；渴望` are hidden instead of shown as grammar information.
+- Tests: 25/25 passing; syntax and diff checks pass.

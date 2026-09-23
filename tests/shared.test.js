@@ -12,3 +12,14 @@ test("escapes Anki HTML", () => assert.equal(s.toAnkiHtml("<b>x</b>\ny"), "&lt;b
 test("builds privacy-preserving source tags", () => assert.deepEqual(s.sourceTags("My Movie!", "www.youtube.com"), ["source-youtube", "title-my-movie"]));
 test("places a tall dictionary above bottom subtitles", () => { const p = s.computeFloatingPosition({ left: 900, top: 650, bottom: 680 }, { width: 330, height: 400 }, { width: 1200, height: 720 }); assert.equal(p.placement, "above"); assert.ok(p.top >= 8); assert.ok(p.left + 330 <= 1192); });
 test("clamps a dictionary inside a small viewport", () => { const p = s.computeFloatingPosition({ left: -20, top: 100, bottom: 120 }, { width: 500, height: 500 }, { width: 320, height: 240 }); assert.equal(p.left, 8); assert.ok(p.top >= 8); assert.ok(p.maxHeight >= 80); });
+test("bottom placement follows moving YouTube captions", () => {
+  const player = { top: 0, bottom: 600 };
+  const lowCaption = { top: 520, bottom: 565 };
+  const raisedCaption = { top: 430, bottom: 475 };
+  const lowTop = s.computeCaptionSafeTop(player, lowCaption, 70, 700, 12);
+  const raisedTop = s.computeCaptionSafeTop(player, raisedCaption, 70, 700, 12);
+  assert.ok(lowTop + 70 <= lowCaption.top - 8);
+  assert.ok(raisedTop + 70 <= raisedCaption.top - 8);
+  assert.ok(raisedTop < lowTop);
+  assert.equal(s.computeCaptionSafeTop(player, null, 70, 700, 12), 518);
+});
