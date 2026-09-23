@@ -57,7 +57,7 @@
     <section>
       <h2>暂停查词与 Anki</h2>
       <label class="check"><input id="dictionaryEnabled" type="checkbox"> 启用暂停查词</label>
-      <p class="hint">视频暂停时选择原字幕中的单词或短语，通过当前本地 AI 服务查看释义和两个例句。</p>
+      <p class="hint">视频暂停时选择原字幕中的单词或短语，通过当前本地 AI 服务查看释义、视频原句及译文。</p>
       <label class="check"><input id="ankiEnabled" type="checkbox"> 启用 Anki 集成</label>
       <div id="ankiSettings">
         <label>AnkiConnect 地址<input id="ankiUrl" type="url" placeholder="http://127.0.0.1:8765"></label>
@@ -66,7 +66,7 @@
           <label>默认牌组<select id="ankiDeck"><option value="Default">Default</option></select></label>
           <label>笔记类型<select id="ankiModel"><option value="Basic">Basic</option></select></label>
         </div>
-        <p class="hint">目前只支持 Basic 笔记类型：正面固定写入 Front，释义、视频原句与译文、新例句与译文合并写入 Back。其他笔记类型在列表中置灰；牌组仍可自由选择。</p>
+        <p class="hint">目前只支持 Basic 笔记类型：正面固定写入 Front，释义、视频原句与译文合并写入 Back。其他笔记类型在列表中置灰；牌组仍可自由选择。</p>
         <label>默认标签<input id="ankiTags" type="text" placeholder="subtitle-learning"></label>
         <p class="hint">需安装 AnkiConnect 并保持 Anki Desktop 运行。默认使用一个长期牌组；添加卡片时可以临时切换或手动新建影片子牌组。</p>
       </div>

@@ -168,3 +168,10 @@
 - Suppress conjugation notes on Japanese nouns, including the reported false “past tense” for お父さん. Japanese examples must look like complete Japanese sentences; kanji-only terms remain valid for lookup.
 - Tests: 37/37 passing; JavaScript syntax and diff checks pass. Live Japanese model accuracy still requires manual review. Kanji-only Japanese needs explicit source-language selection because automatic script detection is ambiguous.
 - Next: manually test Japanese noun/verb examples with the configured local model and refine only the Japanese profile based on observed failures.
+
+## Simplified cards — video sentence only
+
+- Removed automatic new-example fields from the dictionary request, lookup panel, Anki editor, and Basic card back. The original subtitle and its translation remain editable before adding a card.
+- Removed example-swap and regeneration requests, avoiding extra model calls caused by copied or malformed examples.
+- Regression tests: 33/33 passing; JavaScript syntax and diff checks pass. Existing Anki notes are unchanged; new notes use the simplified format.
+- Japanese morphological analysis is not bundled in this phase; evaluate it separately if live testing shows that prompt plus conservative checks remain insufficient.

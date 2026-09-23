@@ -127,7 +127,7 @@ async function lookupWord(message, signal) {
   const model = await discoverModel(settings.serviceUrl);
   const messages = DictionaryLib.buildDictionaryMessages({ term, sentence, source: message.source, target: message.target, kind });
   const endpoint = serviceEndpoint(settings.serviceUrl, "/v1/chat/completions");
-  const basePayload = { model, stream: false, temperature: 0.1, max_tokens: 500, messages };
+  const basePayload = { model, stream: false, temperature: 0.1, max_tokens: 320, messages };
   let entry;
   try {
     entry = await fetchWithTimeout(endpoint, settings.timeoutMs, {
@@ -141,7 +141,6 @@ async function lookupWord(message, signal) {
     if (!/HTTP 400|response.format|json.schema|unsupported|unknown (field|parameter)/i.test(error.message)) throw error;
     entry = await fetchWithTimeout(endpoint, settings.timeoutMs, basePayload, DictionaryLib.parseDictionaryResponse, signal);
   }
-  await repairGeneratedExample(entry, { term, sentence, source: message.source, target: message.target, settings, signal });
   await repairDictionaryQuality(entry, { term, sentence, source: message.source, target: message.target, kind, settings, signal });
   // The model may return a lemma such as "keep" for a selected form "kept".
   entry = DictionaryLib.preserveSelectedTerm(entry, term);
@@ -150,31 +149,6 @@ async function lookupWord(message, signal) {
   if (dictionaryCache.size > 200) dictionaryCache.delete(dictionaryCache.keys().next().value);
   if (!videoSentenceTranslation && sentence) videoSentenceTranslation = await translateWithLlamaCpp(sentence, [], settings, signal);
   return { ...entry, videoSentenceTranslation };
-}
-
-async function repairGeneratedExample(entry, { term, sentence, source, target, settings, signal }) {
-  const resolvedSource = DictionaryLib.inferSourceLanguage(source, sentence);
-  const resolvedTarget = target || settings.target || "zh";
-  const plan = DictionaryLib.classifyExamplePair(entry, term, resolvedSource, resolvedTarget);
-  if (plan.action === "keep") return;
-  if (plan.action === "swap") {
-    [entry.generatedExample, entry.generatedExampleTranslation] = [entry.generatedExampleTranslation, entry.generatedExample];
-    return;
-  }
-  const targetExample = plan.targetExample;
-  if (!targetExample) {
-    entry.generatedExample = ""; entry.generatedExampleTranslation = ""; return;
-  }
-  // Hy-MT2 is a translation model. Use the same simple translation path that
-  // powers subtitles instead of asking it to follow a multi-field generation prompt.
-  const repaired = await translateWithLlamaCpp(targetExample, [], {
-    ...settings, source: resolvedTarget, target: resolvedSource
-  }, signal);
-  if (!DictionaryLib.isExamplePlausible(repaired, resolvedSource) || !DictionaryLib.containsQueryTerm(repaired, term)) {
-    entry.generatedExample = ""; entry.generatedExampleTranslation = ""; return;
-  }
-  entry.generatedExample = repaired;
-  entry.generatedExampleTranslation = targetExample;
 }
 
 async function repairDictionaryQuality(entry, { term, sentence, source, target, kind, settings, signal }) {
@@ -204,32 +178,6 @@ async function repairDictionaryQuality(entry, { term, sentence, source, target, 
   } else {
     entry.definitions = entry.definitions.filter((value) => DictionaryLib.isConciseDefinition(value, targetLanguage));
   }
-  if (DictionaryLib.sameExample(entry.generatedExample, sentence)) {
-    entry.generatedExample = "";
-    entry.generatedExampleTranslation = "";
-    try {
-      const model = await discoverModel(settings.serviceUrl);
-      const candidate = await fetchWithTimeout(serviceEndpoint(settings.serviceUrl, "/v1/chat/completions"), settings.timeoutMs, {
-        model, stream: false, temperature: 0.3, max_tokens: 64,
-        messages: [
-          { role: "system", content: `Write one short, new ${sourceLanguage} example sentence using the user's word. Output only the sentence.` },
-          { role: "user", content: term }
-        ]
-      }, cleanOpenAiResponse, signal);
-      if (DictionaryLib.containsQueryTerm(candidate, term) &&
-          DictionaryLib.isExamplePlausible(candidate, sourceLanguage) &&
-          !DictionaryLib.sameExample(candidate, sentence)) entry.generatedExample = candidate;
-    } catch (error) { if (signal.aborted) throw error; }
-  }
-  if (entry.generatedExample && !DictionaryLib.isTargetLanguage(entry.generatedExampleTranslation, targetLanguage)) {
-    try {
-      const translated = await translateWithLlamaCpp(entry.generatedExample, [], {
-        ...settings, source: sourceLanguage, target: targetLanguage
-      }, signal);
-      entry.generatedExampleTranslation = DictionaryLib.isTargetLanguage(translated, targetLanguage) ? translated : "";
-    } catch (error) { if (signal.aborted) throw error; entry.generatedExampleTranslation = ""; }
-  }
-  if (!entry.generatedExample) entry.generatedExampleTranslation = "";
 }
 
 const ANKI_ACTIONS = new Set(["requestPermission", "version", "deckNames", "createDeck", "modelNames", "modelFieldNames", "modelFieldsOnTemplates", "canAddNotes", "addNote"]);

@@ -1,20 +1,79 @@
-const test = require("node:test"); const assert = require("node:assert/strict"); const d = require("../lib/dictionary.js");
-test("builds stable bilingual dictionary prompt", () => { const messages = d.buildDictionaryMessages({ term: "run", sentence: "I run.", target: "zh" }); assert.match(messages[1].content, /run/); assert.match(messages[0].content, /互不重复/); assert.match(messages[0].content, /不能复制视频原句/); assert.match(messages[1].content, /新例句语言：en/); });
-test("parses fenced response", () => { const r = d.parseDictionaryResponse({ choices: [{ message: { content: '```json\n{"term":"run","definitions":["跑"],"generatedExample":"I run daily."}\n```' } }] }); assert.deepEqual(r.definitions, ["跑"]); });
-test("rejects malformed response", () => assert.throws(() => d.parseDictionaryResponse({ choices: [{ message: { content: "nope" } }] }), /格式/));
-test("accepts JSON surrounded by model chatter and trims arrays", () => { const content = `answer: {"term":"x","definitions":["1","2","3","4","5","6"],"contextualMeaning":"context","generatedExample":"new","generatedExampleTranslation":"新"} done`; const r = d.parseDictionaryResponse({ choices: [{ message: { content } }] }); assert.equal(r.definitions.length, 5); assert.equal(r.generatedExampleTranslation, "新"); });
-test("rejects empty semantic result", () => assert.throws(() => d.parseDictionaryResponse({ choices: [{ message: { content: "{}" } }] }), /有效释义/));
-test("builds a llama.cpp schema-constrained response format", () => { const format = d.dictionaryResponseFormat(); assert.equal(format.type, "json_object"); assert.equal(format.schema.additionalProperties, false); assert.ok(format.schema.required.includes("generatedExample")); assert.equal(format.schema.properties.definitions.maxItems, 5); });
-test("classifies generated example pairs for Hy-MT2 repair", () => { assert.equal(d.classifyExamplePair({ generatedExample: "I think so.", generatedExampleTranslation: "我想是的。" }, "think").action, "keep"); assert.equal(d.classifyExamplePair({ generatedExample: "我想是的。", generatedExampleTranslation: "I think so." }, "think").action, "swap"); assert.deepEqual(d.classifyExamplePair({ generatedExample: "我认真考虑了这件事。", generatedExampleTranslation: "" }, "think"), { action: "reverse", targetExample: "我认真考虑了这件事。" }); });
-test("detects source language and rejects mixed-script corruption", () => { assert.equal(d.inferSourceLanguage("auto", "Was that my question?"), "en"); assert.equal(d.inferSourceLanguage("auto", "これは質問です"), "ja"); assert.equal(d.isLanguagePlausible("Was that my question?", "en"), true); assert.equal(d.isLanguagePlausible("我没问他 question", "en"), false); assert.equal(d.isLanguagePlausible("باللغة الصينية", "en"), false); });
-test("routes mixed generated text through clean reverse translation", () => { const plan = d.classifyExamplePair({ generatedExample: "我没问他 question，他还是个孩子。", generatedExampleTranslation: "باللغة الصينية 我没问他。" }, "question", "en", "zh"); assert.deepEqual(plan, { action: "reverse", targetExample: "我没问他 question，他还是个孩子。" }); });
-test("flags wrong-language definitions and unsafe pronunciation", () => { assert.equal(d.needsDefinitionRepair({ definitions: ["neither", "not either"] }, "zh"), true); assert.equal(d.needsDefinitionRepair({ definitions: ["两者都不"] }, "zh"), false); assert.equal(d.isPlausiblePronunciation("'nsðər"), false); assert.equal(d.isPlausiblePronunciation("/ˈnaɪðər/"), true); assert.equal(d.isTargetLanguage("باللغة الصينية 我没问他。", "zh"), false); });
-test("rejects sentence-like definitions and copied video examples", () => { assert.equal(d.isConciseDefinition("错误，我的错。Bogdan 只是让我留在这里很晚…", "zh"), false); assert.equal(d.isConciseDefinition("保持；留下", "zh"), true); assert.equal(d.sameExample("My fault, my fault. Bogdan just kept me here late...", "My fault, my fault. Bogdan just kept me here late…"), true); assert.equal(d.sameExample("I kept the letter.", "My fault, my fault. Bogdan just kept me here late..."), false); });
-test("preserves selected inflected form instead of model lemma", () => { assert.deepEqual(d.preserveSelectedTerm({ term: "keep", normalizedTerm: "keep", definitions: ["让……待着"] }, "kept"), { term: "kept", normalizedTerm: "keep", definitions: ["让……待着"] }); });
-test("matches example words and phrases at token boundaries", () => { assert.equal(d.containsQueryTerm("The answer is clear.", "he"), false); assert.equal(d.containsQueryTerm("He answered.", "he"), true); assert.equal(d.containsQueryTerm("I gave up yesterday.", "give up"), false); assert.equal(d.containsQueryTerm("I will give up now.", "give up"), true); assert.equal(d.containsQueryTerm("He will keep up with us.", "keep up with"), true); assert.equal(d.classifyExamplePair({ generatedExample: "The answer is clear.", generatedExampleTranslation: "答案很清楚。" }, "he").action, "reverse"); });
-test("context retry asks for a short meaning of the selected form in its sentence", () => { const messages = d.buildContextMeaningMessages({ term: "kept", sentence: "Bogdan just kept me here late.", target: "zh" }); assert.match(messages[0].content, /不要翻译整句/); assert.match(messages[1].content, /kept/); assert.match(messages[1].content, /Bogdan just kept/); });
-test("dictionary prompt distinguishes word forms from whole phrases", () => { const word = d.buildDictionaryMessages({ term: "kept", sentence: "He kept me here.", target: "zh" }); const phrase = d.buildDictionaryMessages({ term: "keep up with", sentence: "Keep up with us.", target: "zh", kind: "phrase" }); assert.match(word[0].content, /词形关系/); assert.match(word[1].content, /查询类型：单词/); assert.match(phrase[1].content, /查询类型：短语/); assert.equal(d.DICTIONARY_SCHEMA.properties.formNote.type, "string"); assert.equal(d.parseDictionaryResponse({ choices: [{ message: { content: '{"term":"kept","definitions":["保持"],"formNote":"keep 的过去式"}' } }] }).formNote, "keep 的过去式"); });
-test("uses independent Japanese dictionary and context guidance", () => { const messages = d.buildDictionaryMessages({ term: "食べました", sentence: "昨日食べました。", source: "ja", target: "zh" }); assert.match(messages[0].content, /辞书形/); assert.match(messages[0].content, /助词、助动词/); assert.match(messages[1].content, /新例句语言：ja/); const retry = d.buildContextMeaningMessages({ term: "食べました", sentence: "昨日食べました。", source: "ja", target: "zh" }); assert.match(retry[0].content, /活用/); });
-test("keeps Japanese kanji terms but requires a plausible full example", () => { assert.equal(d.isLanguagePlausible("学校", "ja"), true); assert.equal(d.isExamplePlausible("学校", "ja"), false); assert.equal(d.isExamplePlausible("学校へ行きます。", "ja"), true); assert.equal(d.isLanguagePlausible("学校へ行きます。", "zh"), false); assert.equal(d.classifyExamplePair({ generatedExample: "学校へ行きます。", generatedExampleTranslation: "我去学校。" }, "学校", "ja", "zh").action, "keep"); });
-test("accepts Japanese kana reading without relaxing English IPA checks", () => { assert.equal(d.isPlausiblePronunciation("たべる", "ja"), true); assert.equal(d.isPlausiblePronunciation("タベル", "ja"), true); assert.equal(d.isPlausiblePronunciation("食べる", "ja"), false); assert.equal(d.isPlausiblePronunciation("たべる", "en"), false); });
-test("never shows invented Japanese noun conjugation", () => { const noun = d.sanitizeWordForm({ partOfSpeech: "noun", normalizedTerm: "お父さんです", formNote: "过去式形式，原形为お父さんです" }, "お父さん", "ja"); assert.equal(noun.normalizedTerm, "お父さん"); assert.equal(noun.formNote, ""); const verb = d.sanitizeWordForm({ partOfSpeech: "动词", normalizedTerm: "食べる", formNote: "食べる的丁寧过去形" }, "食べました", "ja"); assert.equal(verb.formNote, "食べる的丁寧过去形"); });
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const d = require("../lib/dictionary.js");
+
+test("dictionary prompt uses only the video sentence", () => {
+  const messages = d.buildDictionaryMessages({ term: "run", sentence: "I run.", target: "zh" });
+  assert.match(messages[0].content, /不要生成新例句/);
+  assert.match(messages[1].content, /视频原句：I run/);
+  assert.doesNotMatch(messages[1].content, /新例句语言/);
+});
+test("parses fenced response", () => {
+  const result = d.parseDictionaryResponse({ choices: [{ message: { content: '```json\n{"term":"run","definitions":["跑"]}\n```' } }] });
+  assert.deepEqual(result.definitions, ["跑"]);
+});
+test("rejects malformed or empty response", () => {
+  assert.throws(() => d.parseDictionaryResponse({ choices: [{ message: { content: "nope" } }] }), /格式/);
+  assert.throws(() => d.parseDictionaryResponse({ choices: [{ message: { content: "{}" } }] }), /有效释义/);
+});
+test("trims definitions and drops legacy generated examples", () => {
+  const content = 'answer: {"term":"x","definitions":["1","2","3","4","5","6"],"generatedExample":"old"} done';
+  const result = d.parseDictionaryResponse({ choices: [{ message: { content } }] });
+  assert.equal(result.definitions.length, 5);
+  assert.equal(Object.hasOwn(result, "generatedExample"), false);
+});
+test("schema does not request generated examples", () => {
+  const format = d.dictionaryResponseFormat();
+  assert.equal(format.type, "json_object");
+  assert.equal(format.schema.additionalProperties, false);
+  assert.equal(Object.hasOwn(format.schema.properties, "generatedExample"), false);
+});
+test("detects source language and rejects mixed-script corruption", () => {
+  assert.equal(d.inferSourceLanguage("auto", "Was that my question?"), "en");
+  assert.equal(d.inferSourceLanguage("auto", "これは質問です"), "ja");
+  assert.equal(d.isLanguagePlausible("Was that my question?", "en"), true);
+  assert.equal(d.isLanguagePlausible("我没问他 question", "en"), false);
+});
+test("flags wrong-language definitions and unsafe pronunciation", () => {
+  assert.equal(d.needsDefinitionRepair({ definitions: ["neither"] }, "zh"), true);
+  assert.equal(d.needsDefinitionRepair({ definitions: ["两者都不"] }, "zh"), false);
+  assert.equal(d.isPlausiblePronunciation("'nsðər"), false);
+  assert.equal(d.isPlausiblePronunciation("/ˈnaɪðər/"), true);
+});
+test("rejects sentence-like definitions", () => {
+  assert.equal(d.isConciseDefinition("错误，我的错。Bogdan 只是让我留在这里很晚…", "zh"), false);
+  assert.equal(d.isConciseDefinition("保持；留下", "zh"), true);
+});
+test("preserves selected inflected form instead of model lemma", () => {
+  assert.equal(d.preserveSelectedTerm({ term: "keep" }, "kept").term, "kept");
+});
+test("context retry asks for a short meaning of the selected form", () => {
+  const messages = d.buildContextMeaningMessages({ term: "kept", sentence: "Bogdan just kept me here late.", target: "zh" });
+  assert.match(messages[0].content, /不要翻译整句/);
+  assert.match(messages[1].content, /Bogdan just kept/);
+});
+test("dictionary prompt distinguishes word forms from phrases", () => {
+  const word = d.buildDictionaryMessages({ term: "kept", sentence: "He kept me here.", target: "zh" });
+  const phrase = d.buildDictionaryMessages({ term: "keep up with", sentence: "Keep up with us.", target: "zh", kind: "phrase" });
+  assert.match(word[0].content, /词形关系/);
+  assert.match(phrase[1].content, /查询类型：短语/);
+});
+test("uses independent Japanese dictionary and context guidance", () => {
+  const messages = d.buildDictionaryMessages({ term: "食べました", sentence: "昨日食べました。", source: "ja", target: "zh" });
+  assert.match(messages[0].content, /辞书形/);
+  assert.match(messages[1].content, /原句语言：ja/);
+  assert.match(d.buildContextMeaningMessages({ term: "食べました", sentence: "昨日食べました。", source: "ja", target: "zh" })[0].content, /活用/);
+});
+test("accepts Japanese kanji terms but rejects Japanese text as Chinese", () => {
+  assert.equal(d.isLanguagePlausible("学校", "ja"), true);
+  assert.equal(d.isLanguagePlausible("学校へ行きます。", "zh"), false);
+});
+test("accepts Japanese kana reading without relaxing English IPA checks", () => {
+  assert.equal(d.isPlausiblePronunciation("たべる", "ja"), true);
+  assert.equal(d.isPlausiblePronunciation("たべる", "en"), false);
+});
+test("never shows invented Japanese noun conjugation", () => {
+  const noun = d.sanitizeWordForm({ partOfSpeech: "noun", normalizedTerm: "お父さんです", formNote: "过去式形式" }, "お父さん", "ja");
+  assert.equal(noun.normalizedTerm, "お父さん");
+  assert.equal(noun.formNote, "");
+});

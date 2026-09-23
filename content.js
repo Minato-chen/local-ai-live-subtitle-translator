@@ -574,7 +574,6 @@ function renderDictionary(entry) {
   // The definitions already explain the word. Keep contextualMeaning in the
   // data for Anki, but avoid repeating a near-identical definition in the UI.
   appendBilingualExample(dictionaryPanel, uiText("视频原句", "Video sentence"), entry.videoSentence, entry.videoSentenceTranslation);
-  appendBilingualExample(dictionaryPanel, uiText("新例句", "New example"), entry.generatedExample, entry.generatedExampleTranslation);
   dictionaryPanel.append(panelButton(
     settings.ankiEnabled ? uiText("添加到 Anki", "Add to Anki") : uiText("设置 Anki", "Set up Anki"),
     () => settings.ankiEnabled ? openAnkiEditor(entry) : openAnkiSettings(),
@@ -635,8 +634,6 @@ async function openAnkiEditor(entry) {
     meaning: addEditorField("meaning", uiText("释义", "Meaning"), (entry.definitions || []).join("；"), "textarea"),
     videoSentence: addEditorField("videoSentence", uiText("视频原句", "Video sentence"), entry.videoSentence, "textarea"),
     videoTranslation: addEditorField("videoTranslation", uiText("视频原句译文", "Video sentence translation"), entry.videoSentenceTranslation, "textarea"),
-    generatedExample: addEditorField("generatedExample", uiText("新例句", "New example"), entry.generatedExample, "textarea"),
-    exampleTranslation: addEditorField("exampleTranslation", uiText("例句翻译", "Example translation"), entry.generatedExampleTranslation, "textarea"),
     tags: addEditorField("tags", uiText("标签", "Tags"), [settings.ankiTags, ...SubtitleShared.sourceTags(entry.sourceTitle, location.hostname)].filter(Boolean).join(" "))
   };
   const newDeck = panelButton(uiText("新建牌组", "New deck"), () => createDeckFromEditor(deck), "nf-zh-secondary");
