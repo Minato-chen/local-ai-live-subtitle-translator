@@ -65,3 +65,4 @@ These checks are blocked in the current environment because Netflix/browser inte
 - Automatic source and playback-time references were removed from newly created cards at the user's request; deck selection remains available for show-level organization.
 - Paused space-delimited subtitles now use whole-word click/drag selection to prevent partial-word lookups, while CJK subtitles keep native text selection. The regression suite passes 26/26 tests.
 - Review follow-up fixed empty-definition cards, selected-term preservation, Anki template-status reporting, substring example matches, and context-free definition retries. The regression suite now passes 30/30 tests.
+- Fixed the word-block subtitle layout regression that visually removed spaces between words; verified the repaired spacing in a temporary browser render.

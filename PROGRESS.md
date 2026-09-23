@@ -148,3 +148,8 @@
 - Match generated examples against whole words or contiguous phrase tokens instead of substrings.
 - When definitions fail quality checks, use a concise contextual meaning if valid; otherwise request one short meaning for the selected text within its sentence, rejecting sentence-like output.
 - Regression suite: 30/30 tests passing, JavaScript syntax and diff checks pass. Live model and Anki interactions remain manual checks.
+
+## Post-release fix — Restore spacing in word-block subtitles
+
+- The original subtitle container no longer uses table formatting, which collapsed whitespace-only text nodes between clickable word spans.
+- Switched it to a centered fit-content block with preserved whitespace and viewport-constrained wrapping. A temporary headless-browser render confirmed normal word spacing.

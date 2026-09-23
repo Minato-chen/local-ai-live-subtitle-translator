@@ -23,6 +23,12 @@
 }
 
 #nf-zh-overlay .nf-zh-source {
+  /* A table formatting context drops whitespace-only text nodes between word spans. */
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: pre-wrap;
   font-size: calc(var(--nf-zh-font-size) * 0.65);
   color: #e6e6e6;
 }
