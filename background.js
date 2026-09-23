@@ -39,6 +39,13 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "OPEN_OPTIONS") {
+    chrome.runtime.openOptionsPage()
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
   if (message?.type === "TRANSLATE") {
     const controller = new AbortController();
     if (message.requestId) activeTranslations.set(message.requestId, controller);

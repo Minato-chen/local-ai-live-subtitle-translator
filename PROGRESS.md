@@ -70,3 +70,9 @@
 - The panel now chooses the side with enough space (normally above bottom subtitles), clamps horizontally and vertically to an 8 px viewport margin, and uses internal scrolling when neither side can fit the full content.
 - Window resizing recomputes the position; overscroll is contained inside the panel.
 - Regression suite: 20/20 tests passing, including bottom-subtitle and small-viewport cases.
+
+## Post-release fix — Discoverable Anki action
+
+- The dictionary card now always shows an Anki action. Before configuration it reads “设置 Anki” and opens the extension settings; after enabling Anki it reads “添加到 Anki” and opens the note editor.
+- Strengthened the dictionary prompt so the generated example stays in the source language and its translation stays in the target language; identical duplicate lines are hidden defensively.
+- Regression suite remains 20/20 passing.

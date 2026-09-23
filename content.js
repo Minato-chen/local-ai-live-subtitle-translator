@@ -466,9 +466,23 @@ function renderDictionary(entry) {
   for (const definition of entry.definitions || []) appendText(dictionaryPanel, `• ${definition}`);
   if (entry.contextualMeaning) appendLabeled(dictionaryPanel, uiText("语境释义", "In context"), entry.contextualMeaning);
   appendLabeled(dictionaryPanel, uiText("视频原句", "Video sentence"), entry.videoSentence);
-  if (entry.generatedExample) appendLabeled(dictionaryPanel, uiText("新例句", "New example"), `${entry.generatedExample}${entry.generatedExampleTranslation ? `\n${entry.generatedExampleTranslation}` : ""}`);
-  if (settings.ankiEnabled) dictionaryPanel.append(panelButton(uiText("添加到 Anki", "Add to Anki"), () => openAnkiEditor(entry), "nf-zh-primary"));
+  if (entry.generatedExample) {
+    const translation = entry.generatedExampleTranslation && entry.generatedExampleTranslation !== entry.generatedExample
+      ? `\n${entry.generatedExampleTranslation}`
+      : "";
+    appendLabeled(dictionaryPanel, uiText("新例句", "New example"), `${entry.generatedExample}${translation}`);
+  }
+  dictionaryPanel.append(panelButton(
+    settings.ankiEnabled ? uiText("添加到 Anki", "Add to Anki") : uiText("设置 Anki", "Set up Anki"),
+    () => settings.ankiEnabled ? openAnkiEditor(entry) : openAnkiSettings(),
+    "nf-zh-primary"
+  ));
   positionDictionaryPanel();
+}
+
+async function openAnkiSettings() {
+  const response = await chrome.runtime.sendMessage({ type: "OPEN_OPTIONS" });
+  if (!response?.ok) renderPanelMessage(dictionaryPanel, response?.error || uiText("无法打开设置", "Could not open settings"), true);
 }
 
 function positionDictionaryPanel() {

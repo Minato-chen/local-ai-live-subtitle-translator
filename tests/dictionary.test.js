@@ -1,5 +1,5 @@
 const test = require("node:test"); const assert = require("node:assert/strict"); const d = require("../lib/dictionary.js");
-test("builds dictionary prompt", () => assert.match(d.buildDictionaryMessages({ term: "run", sentence: "I run.", target: "zh" })[1].content, /run/));
+test("builds dictionary prompt", () => { const messages = d.buildDictionaryMessages({ term: "run", sentence: "I run.", target: "zh" }); assert.match(messages[1].content, /run/); assert.match(messages[0].content, /源语言/); assert.match(messages[0].content, /两者不得相同/); });
 test("parses fenced response", () => { const r = d.parseDictionaryResponse({ choices: [{ message: { content: '```json\n{"term":"run","definitions":["跑"],"generatedExample":"I run daily."}\n```' } }] }); assert.deepEqual(r.definitions, ["跑"]); });
 test("rejects malformed response", () => assert.throws(() => d.parseDictionaryResponse({ choices: [{ message: { content: "nope" } }] }), /格式/));
 test("accepts JSON surrounded by model chatter and trims arrays", () => { const content = `answer: {"term":"x","definitions":["1","2","3","4","5","6"],"contextualMeaning":"context","generatedExample":"new","generatedExampleTranslation":"新"} done`; const r = d.parseDictionaryResponse({ choices: [{ message: { content } }] }); assert.equal(r.definitions.length, 5); assert.equal(r.generatedExampleTranslation, "新"); });
