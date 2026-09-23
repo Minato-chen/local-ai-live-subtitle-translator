@@ -113,8 +113,11 @@ async function lookupWord(message, signal) {
   const settings = await chrome.storage.sync.get(DEFAULTS);
   const term = SubtitleShared.normalizeSelection(message.term);
   if (!term) throw new Error("请选择不超过 80 个字符的单词或短语");
+  const kind = message.kind === "phrase" ? "phrase" : "word";
+  const selectionIssue = SubtitleShared.selectionIssue(term, kind);
+  if (selectionIssue) throw new Error(selectionIssue);
   const sentence = String(message.sentence || "").trim().slice(0, 500);
-  const cacheKey = JSON.stringify([settings.serviceUrl, message.source, message.target, term, sentence]);
+  const cacheKey = JSON.stringify([settings.serviceUrl, message.source, message.target, kind, term, sentence]);
   let videoSentenceTranslation = String(message.videoSentenceTranslation || "").trim().slice(0, 500);
   if (videoSentenceTranslation && !DictionaryLib.isTargetLanguage(videoSentenceTranslation, message.target || settings.target || "zh")) videoSentenceTranslation = "";
   if (dictionaryCache.has(cacheKey)) {
@@ -122,7 +125,7 @@ async function lookupWord(message, signal) {
     return { ...dictionaryCache.get(cacheKey), videoSentenceTranslation };
   }
   const model = await discoverModel(settings.serviceUrl);
-  const messages = DictionaryLib.buildDictionaryMessages({ term, sentence, source: message.source, target: message.target });
+  const messages = DictionaryLib.buildDictionaryMessages({ term, sentence, source: message.source, target: message.target, kind });
   const endpoint = serviceEndpoint(settings.serviceUrl, "/v1/chat/completions");
   const basePayload = { model, stream: false, temperature: 0.1, max_tokens: 500, messages };
   let entry;
@@ -139,9 +142,10 @@ async function lookupWord(message, signal) {
     entry = await fetchWithTimeout(endpoint, settings.timeoutMs, basePayload, DictionaryLib.parseDictionaryResponse, signal);
   }
   await repairGeneratedExample(entry, { term, sentence, source: message.source, target: message.target, settings, signal });
-  await repairDictionaryQuality(entry, { term, sentence, source: message.source, target: message.target, settings, signal });
+  await repairDictionaryQuality(entry, { term, sentence, source: message.source, target: message.target, kind, settings, signal });
   // The model may return a lemma such as "keep" for a selected form "kept".
   entry = DictionaryLib.preserveSelectedTerm(entry, term);
+  entry.kind = kind;
   dictionaryCache.set(cacheKey, entry);
   if (dictionaryCache.size > 200) dictionaryCache.delete(dictionaryCache.keys().next().value);
   if (!videoSentenceTranslation && sentence) videoSentenceTranslation = await translateWithLlamaCpp(sentence, [], settings, signal);
@@ -173,10 +177,16 @@ async function repairGeneratedExample(entry, { term, sentence, source, target, s
   entry.generatedExampleTranslation = targetExample;
 }
 
-async function repairDictionaryQuality(entry, { term, sentence, source, target, settings, signal }) {
+async function repairDictionaryQuality(entry, { term, sentence, source, target, kind, settings, signal }) {
   const targetLanguage = target || settings.target || "zh";
   const sourceLanguage = DictionaryLib.inferSourceLanguage(source, sentence);
   if (!DictionaryLib.isPlausiblePronunciation(entry.pronunciation)) entry.pronunciation = "";
+  if (kind === "phrase") {
+    entry.pronunciation = ""; entry.partOfSpeech = ""; entry.formNote = ""; entry.normalizedTerm = term;
+  } else if (!entry.normalizedTerm || entry.normalizedTerm.toLocaleLowerCase() === term.toLocaleLowerCase() ||
+             !DictionaryLib.isTargetLanguage(entry.formNote, targetLanguage) || entry.formNote.length > 80) {
+    entry.formNote = "";
+  }
   if (DictionaryLib.needsDefinitionRepair(entry, targetLanguage)) {
     if (DictionaryLib.isConciseDefinition(entry.contextualMeaning, targetLanguage)) {
       entry.definitions = [entry.contextualMeaning];

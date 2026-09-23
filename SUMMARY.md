@@ -66,3 +66,4 @@ These checks are blocked in the current environment because Netflix/browser inte
 - Paused space-delimited subtitles now use whole-word click/drag selection to prevent partial-word lookups, while CJK subtitles keep native text selection. The regression suite passes 26/26 tests.
 - Review follow-up fixed empty-definition cards, selected-term preservation, Anki template-status reporting, substring example matches, and context-free definition retries. The regression suite now passes 30/30 tests.
 - Fixed the word-block subtitle layout regression that visually removed spaces between words; verified the repaired spacing in a temporary browser render.
+- Limited the current lookup scope to words and confirmed short phrases. Non-space-delimited text requires selection confirmation, cross-sentence phrases are rejected, and optional word-form notes are added without hard-coded conjugation rules. Sentence cards remain deferred.

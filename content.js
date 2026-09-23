@@ -443,7 +443,11 @@ function handleSelectionMouseUp(event) {
     if (token && !sourceLine.contains(token)) return;
     const end = token ? Number(token.dataset.blockIndex) : drag.end;
     const term = SubtitleShared.wordBlockRange(wordBlockParts, drag.start, end);
-    if (term) requestDictionary(term, lastSource, blockRangeRect(drag.start, end));
+    if (term) {
+      const rect = blockRangeRect(drag.start, end);
+      if (drag.start === end) startSelectedLookup(term, lastSource, rect, "word");
+      else showSelectionConfirmation(term, lastSource, rect, ["phrase"]);
+    }
     return;
   }
   if (wordBlockParts) return;
@@ -452,7 +456,7 @@ function handleSelectionMouseUp(event) {
   const term = SubtitleShared.normalizeSelection(selection.toString());
   if (!term) return;
   const rect = selection.getRangeAt(0).getBoundingClientRect();
-  requestDictionary(term, lastSource, rect);
+  showSelectionConfirmation(term, lastSource, rect, ["word", "phrase"]);
 }
 
 function renderSourceLine(text) {
@@ -504,7 +508,25 @@ function blockRangeRect(start, end) {
 
 function uiText(zh, en) { return settings.uiLanguage === "en" ? en : zh; }
 
-async function requestDictionary(term, sentence, rect) {
+function startSelectedLookup(term, sentence, rect, kind) {
+  const issue = SubtitleShared.selectionIssue(term, kind);
+  if (issue) { showDictionaryShell(rect, term, issue); return; }
+  requestDictionary(term, sentence, rect, kind);
+}
+
+function showSelectionConfirmation(term, sentence, rect, kinds) {
+  const available = kinds.filter((kind) => !SubtitleShared.selectionIssue(term, kind));
+  if (!available.length) { showDictionaryShell(rect, term, SubtitleShared.selectionIssue(term, kinds.at(-1))); return; }
+  showDictionaryShell(rect, term, uiText("请确认选中的内容和查询类型", "Confirm the selected text and lookup type"));
+  for (const kind of available) {
+    const label = kind === "word" ? uiText("查单词", "Look up word") : uiText("查短语", "Look up phrase");
+    dictionaryPanel.append(panelButton(label, () => startSelectedLookup(term, sentence, rect, kind), "nf-zh-secondary"));
+  }
+  dictionaryPanel.append(panelButton(uiText("取消", "Cancel"), closeInteractivePanels, "nf-zh-secondary"));
+  positionDictionaryPanel();
+}
+
+async function requestDictionary(term, sentence, rect, kind = "word") {
   const version = ++lookupVersion;
   if (lookupRequestId) chrome.runtime.sendMessage({ type: "CANCEL_LOOKUP", requestId: lookupRequestId }).catch(() => {});
   lookupRequestId = `lookup-${Date.now()}-${version}`;
@@ -512,7 +534,7 @@ async function requestDictionary(term, sentence, rect) {
   try {
     const visibleTranslation = translatedLine.textContent.trim();
     const videoSentenceTranslation = translatedSource === sentence && visibleTranslation && visibleTranslation !== "..." ? visibleTranslation : "";
-    const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, sentence, videoSentenceTranslation, source: settings.source, target: settings.target });
+    const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, kind, sentence, videoSentenceTranslation, source: settings.source, target: settings.target });
     if (version !== lookupVersion || !videoPaused) return;
     if (!response?.ok) throw new Error(response?.error || uiText("查词失败", "Lookup failed"));
     lastDictionaryEntry = {
@@ -531,9 +553,11 @@ function showDictionaryShell(rect, term, message) {
   editorPanel.hidden = true;
   dictionaryPanel.hidden = false;
   dictionaryPanel.replaceChildren();
+  const header = document.createElement("div"); header.className = "nf-zh-panel-header";
   const title = document.createElement("strong"); title.textContent = term;
   const status = document.createElement("p"); status.textContent = message;
-  dictionaryPanel.append(title, status);
+  header.append(title, panelButton("×", closeInteractivePanels, "nf-zh-close"));
+  dictionaryPanel.append(header, status);
   dictionaryAnchor = rect ? { left: rect.left, top: rect.top, bottom: rect.bottom } : null;
   positionDictionaryPanel();
 }
@@ -545,6 +569,7 @@ function renderDictionary(entry) {
   const close = panelButton("×", closeInteractivePanels, "nf-zh-close"); header.append(word, close);
   dictionaryPanel.append(header);
   if (entry.pronunciation || entry.partOfSpeech) appendText(dictionaryPanel, [entry.pronunciation, entry.partOfSpeech].filter(Boolean).join(" · "), "nf-zh-meta");
+  if (entry.formNote) appendText(dictionaryPanel, `${uiText("词形：", "Form: ")}${entry.formNote}`, "nf-zh-meta");
   for (const definition of entry.definitions || []) appendText(dictionaryPanel, `• ${definition}`);
   // The definitions already explain the word. Keep contextualMeaning in the
   // data for Anki, but avoid repeating a near-identical definition in the UI.
@@ -605,6 +630,7 @@ async function openAnkiEditor(entry) {
   const deck = addEditorField("deck", uiText("牌组", "Deck"), sessionDeck || settings.ankiDeck, "select");
   const fields = {
     term: addEditorField("term", uiText("词语", "Term"), entry.term || entry.normalizedTerm),
+    ...(entry.formNote ? { formNote: addEditorField("formNote", uiText("词形说明", "Word form"), entry.formNote) } : {}),
     partOfSpeech: addEditorField("partOfSpeech", uiText("词性", "Part of speech"), entry.partOfSpeech),
     meaning: addEditorField("meaning", uiText("释义", "Meaning"), (entry.definitions || []).join("；"), "textarea"),
     videoSentence: addEditorField("videoSentence", uiText("视频原句", "Video sentence"), entry.videoSentence, "textarea"),

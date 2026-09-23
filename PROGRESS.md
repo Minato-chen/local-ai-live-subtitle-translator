@@ -153,3 +153,10 @@
 
 - The original subtitle container no longer uses table formatting, which collapsed whitespace-only text nodes between clickable word spans.
 - Switched it to a centered fit-content block with preserved whitespace and viewport-constrained wrapping. A temporary headless-browser render confirmed normal word spacing.
+
+## Scope update — Word-first lookup, confirmed phrases
+
+- Single word-block clicks still query immediately; multi-block Latin selections require a visible phrase confirmation.
+- Native selections for non-space-delimited subtitles require confirmation of the exact text and word/phrase type before lookup.
+- Short phrases cannot cross clear sentence punctuation; long phrases are rejected. Sentence grammar parsing and sentence cards are deferred.
+- Dictionary requests now distinguish words from phrases. Optional model-provided word-form notes can appear in the dictionary and Basic card back; uncertain notes are omitted.
