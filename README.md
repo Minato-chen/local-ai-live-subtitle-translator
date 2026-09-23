@@ -4,6 +4,13 @@
 
 Edge/Chrome 扩展：读取 Netflix 或 YouTube 播放器中的原字幕，通过本机兼容 OpenAI API 的翻译服务实时显示中文字幕。默认推荐 `llama.cpp + Hy-MT2 Q4_K_M`。
 
+## 选择版本
+
+- **稳定版**：从 Microsoft Edge 扩展商店安装。商店版目前为 `v2.0.4`，通过商店渠道更新。
+- **开发预览版**：从 [GitHub Releases](https://github.com/Minato-chen/local-ai-live-subtitle-translator/releases) 下载标为 **Pre-release** 的 `local-ai-live-subtitle-translator-*.zip`。此版本用于试用新功能，可能有未发现的问题，不会通过 Edge 商店自动更新。
+
+建议在单独的浏览器配置文件中试用开发预览版，避免商店版和预览版同时在同一个视频页面运行。
+
 ## 安装
 
 1. 安装 llama.cpp。
@@ -22,7 +29,7 @@ Edge/Chrome 扩展：读取 Netflix 或 YouTube 播放器中的原字幕，通�
    curl -LsSf https://llama.app/install.sh | sh
    ```
 
-2. 打开浏览器扩展管理页面，启用开发人员模式，选择“加载解压缩的扩展”，并选择本项目所在目录。
+2. 若使用商店稳定版，直接从 Edge 扩展商店安装，跳过本步骤。若使用 GitHub 开发预览版，先解压 Release 中的 ZIP，再打开浏览器扩展管理页面，启用开发人员模式，选择“加载解压缩的扩展”，并选择包含 `manifest.json` 的解压目录。更新预览版时需重新下载、解压并重新加载扩展。
 
    Edge：`edge://extensions`
 
