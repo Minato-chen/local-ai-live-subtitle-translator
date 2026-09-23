@@ -192,3 +192,9 @@
 - Added a bounded `kind` field to the dictionary schema. Invalid or missing classifications fall back to neutral meaning display without part of speech or form claims; clearly spaced multiword selections are always phrases.
 - Validated distinct base forms can appear in the dictionary and as editable Anki back content. Phrase results may include a short nonduplicate usage note. Both continue to use only the video sentence and its translation.
 - Automated tests: 40/40 passing; syntax and diff checks pass. Manual browser and local-model testing remain to be done.
+
+## Kanji-only Japanese lookup
+
+- Auto source-language detection now checks up to eight recent original subtitle lines for kana when the selected line contains only Han characters. Explicit source-language settings still take precedence.
+- The resolved source language is shared across dictionary prompting, word-form checks, and cache keys, avoiding a Japanese prompt paired with Chinese quality checks.
+- Limitation: a kanji-only passage with no kana evidence remains ambiguous and requires explicit Japanese selection. Automated regression tests and syntax checks pass; manual playback testing remains.

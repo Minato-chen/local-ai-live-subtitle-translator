@@ -56,6 +56,8 @@ Enable paused lookup, then pause a video to reveal the current original subtitle
 
 AI definitions are learning aids rather than authoritative dictionary entries. A definition in the wrong language gets one local retry and is omitted if still invalid. This cannot catch every semantic error, so review notes before adding them to Anki. Lookup text is sent only to the configured local OpenAI-compatible service.
 
+In auto mode, a kanji-only subtitle lookup checks recent original subtitle lines for kana evidence before treating it as Chinese. If the whole passage lacks kana, the script alone cannot reliably distinguish Japanese from Chinese; explicitly select the source language in settings.
+
 ## Anki Integration
 
 1. Install Anki Desktop and install [AnkiConnect](https://ankiweb.net/shared/info/2055492159) from AnkiWeb. Restart Anki and keep it running.

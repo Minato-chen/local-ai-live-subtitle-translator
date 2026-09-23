@@ -32,6 +32,10 @@ test("schema does not request generated examples", () => {
 test("detects source language and rejects mixed-script corruption", () => {
   assert.equal(d.inferSourceLanguage("auto", "Was that my question?"), "en");
   assert.equal(d.inferSourceLanguage("auto", "これは質問です"), "ja");
+  assert.equal(d.inferSourceLanguage("auto", "学校", ["昨日は映画を見た。"]), "ja");
+  assert.equal(d.inferSourceLanguage("auto", "学校", ["昨日は映画を見た。", "Hello there!"]), "zh");
+  assert.equal(d.inferSourceLanguage("zh", "学校", ["昨日は映画を見た。"]), "zh");
+  assert.equal(d.inferSourceLanguage("ja", "学校", []), "ja");
   assert.equal(d.isLanguagePlausible("Was that my question?", "en"), true);
   assert.equal(d.isLanguagePlausible("我没问他 question", "en"), false);
 });

@@ -117,7 +117,8 @@ async function lookupWord(message, signal) {
   const selectionIssue = SubtitleShared.selectionIssue(term, kind);
   if (selectionIssue) throw new Error(selectionIssue);
   const sentence = String(message.sentence || "").trim().slice(0, 500);
-  const cacheKey = JSON.stringify([settings.serviceUrl, message.source, message.target, kind, term, sentence]);
+  const sourceLanguage = DictionaryLib.inferSourceLanguage(message.source, sentence, message.context);
+  const cacheKey = JSON.stringify([settings.serviceUrl, sourceLanguage, message.target, kind, term, sentence]);
   let videoSentenceTranslation = String(message.videoSentenceTranslation || "").trim().slice(0, 500);
   if (videoSentenceTranslation && !DictionaryLib.isTargetLanguage(videoSentenceTranslation, message.target || settings.target || "zh")) videoSentenceTranslation = "";
   if (dictionaryCache.has(cacheKey)) {
@@ -125,7 +126,7 @@ async function lookupWord(message, signal) {
     return { ...dictionaryCache.get(cacheKey), videoSentenceTranslation };
   }
   const model = await discoverModel(settings.serviceUrl);
-  const messages = DictionaryLib.buildDictionaryMessages({ term, sentence, source: message.source, target: message.target, kind });
+  const messages = DictionaryLib.buildDictionaryMessages({ term, sentence, source: sourceLanguage, target: message.target, kind });
   const endpoint = serviceEndpoint(settings.serviceUrl, "/v1/chat/completions");
   const basePayload = { model, stream: false, temperature: 0.1, max_tokens: 320, messages };
   let entry;
@@ -144,7 +145,7 @@ async function lookupWord(message, signal) {
   const resolvedKind = DictionaryLib.resolveLookupKind(kind, entry.kind, term);
   const resolvedIssue = SubtitleShared.selectionIssue(term, resolvedKind);
   if (resolvedIssue) throw new Error(resolvedIssue);
-  await repairDictionaryQuality(entry, { term, sentence, source: message.source, target: message.target, kind: resolvedKind, settings, signal });
+  await repairDictionaryQuality(entry, { term, sentence, source: sourceLanguage, target: message.target, kind: resolvedKind, settings, signal });
   // The model may return a lemma such as "keep" for a selected form "kept".
   entry = DictionaryLib.preserveSelectedTerm(entry, term);
   entry.kind = resolvedKind;

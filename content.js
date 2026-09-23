@@ -522,7 +522,8 @@ async function requestDictionary(term, sentence, rect, kind = "word") {
   try {
     const visibleTranslation = translatedLine.textContent.trim();
     const videoSentenceTranslation = translatedSource === sentence && visibleTranslation && visibleTranslation !== "..." ? visibleTranslation : "";
-    const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, kind, sentence, videoSentenceTranslation, source: settings.source, target: settings.target });
+    const context = subtitleHistory.slice(0, -1).slice(-8);
+    const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, kind, sentence, context, videoSentenceTranslation, source: settings.source, target: settings.target });
     if (version !== lookupVersion || !videoPaused) return;
     if (!response?.ok) throw new Error(response?.error || uiText("查词失败", "Lookup failed"));
     lastDictionaryEntry = {
