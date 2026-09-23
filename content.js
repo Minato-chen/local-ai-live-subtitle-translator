@@ -27,6 +27,7 @@ const cache = new Map();
 const subtitleHistory = [];
 let settings = { ...DEFAULTS };
 let lastSource = "";
+let translatedSource = "";
 let requestVersion = 0;
 let debounceTimer;
 let translationInFlight = false;
@@ -161,6 +162,7 @@ function scanSubtitles() {
   if (!text || text === lastSource) return;
   if (lastSource) closeInteractivePanels();
   lastSource = text;
+  translatedSource = "";
   const version = ++requestVersion;
   sourceLine.textContent = text;
   updatePausedUi();
@@ -247,6 +249,7 @@ async function translateOne(text, context, version, requestId) {
 
 function showTranslation(text, version) {
   if (version !== requestVersion) return;
+  translatedSource = lastSource;
   translatedLine.textContent = text;
   statusLine.textContent = "";
   positionOverlay();
@@ -435,7 +438,7 @@ async function requestDictionary(term, sentence, rect) {
   showDictionaryShell(rect, term, uiText("正在查询…", "Looking up…"));
   try {
     const visibleTranslation = translatedLine.textContent.trim();
-    const videoSentenceTranslation = visibleTranslation && visibleTranslation !== "..." ? visibleTranslation : "";
+    const videoSentenceTranslation = translatedSource === sentence && visibleTranslation && visibleTranslation !== "..." ? visibleTranslation : "";
     const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, sentence, videoSentenceTranslation, source: settings.source, target: settings.target });
     if (version !== lookupVersion || !videoPaused) return;
     if (!response?.ok) throw new Error(response?.error || uiText("查词失败", "Lookup failed"));

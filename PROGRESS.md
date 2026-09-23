@@ -115,3 +115,10 @@
 
 - Kept deck selection unrestricted, but disabled non-Basic note types in the settings list with a visible “currently only Basic” label.
 - Fixed note fields to `Front` and `Back`, removed field-mapping controls, and reject unsupported note types on final submission as well as settings save.
+
+## Post-release update — Dictionary result quality gate
+
+- A lookup reuses the visible subtitle translation only when it belongs to the selected source line and matches the configured target language.
+- Definitions in the wrong language and generated-example translations in the wrong language receive one targeted local translation attempt. Bad retries are omitted instead of presented as valid results; normal fields incur no extra request.
+- Obviously malformed pronunciation is hidden. Language checks cannot prove semantic correctness, so fluent but wrong translations still need review before Anki submission.
+- Verification: 25/25 automated tests, JavaScript syntax checks, and whitespace checks passed. Live model output still needs user-profile testing.

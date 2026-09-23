@@ -116,6 +116,7 @@ async function lookupWord(message, signal) {
   const sentence = String(message.sentence || "").trim().slice(0, 500);
   const cacheKey = JSON.stringify([settings.serviceUrl, message.source, message.target, term, sentence]);
   let videoSentenceTranslation = String(message.videoSentenceTranslation || "").trim().slice(0, 500);
+  if (videoSentenceTranslation && !DictionaryLib.isTargetLanguage(videoSentenceTranslation, message.target || settings.target || "zh")) videoSentenceTranslation = "";
   if (dictionaryCache.has(cacheKey)) {
     if (!videoSentenceTranslation && sentence) videoSentenceTranslation = await translateWithLlamaCpp(sentence, [], settings, signal);
     return { ...dictionaryCache.get(cacheKey), videoSentenceTranslation };
@@ -138,6 +139,7 @@ async function lookupWord(message, signal) {
     entry = await fetchWithTimeout(endpoint, settings.timeoutMs, basePayload, DictionaryLib.parseDictionaryResponse, signal);
   }
   await repairGeneratedExample(entry, { term, sentence, source: message.source, target: message.target, settings, signal });
+  await repairDictionaryQuality(entry, { term, sentence, source: message.source, target: message.target, settings, signal });
   if (!entry.term) entry.term = term;
   dictionaryCache.set(cacheKey, entry);
   if (dictionaryCache.size > 200) dictionaryCache.delete(dictionaryCache.keys().next().value);
@@ -168,6 +170,32 @@ async function repairGeneratedExample(entry, { term, sentence, source, target, s
   }
   entry.generatedExample = repaired;
   entry.generatedExampleTranslation = targetExample;
+}
+
+async function repairDictionaryQuality(entry, { term, sentence, source, target, settings, signal }) {
+  const targetLanguage = target || settings.target || "zh";
+  const sourceLanguage = DictionaryLib.inferSourceLanguage(source, sentence);
+  if (!DictionaryLib.isPlausiblePronunciation(entry.pronunciation)) entry.pronunciation = "";
+  if (DictionaryLib.needsDefinitionRepair(entry, targetLanguage)) {
+    const gloss = (entry.definitions || []).join("；") || entry.contextualMeaning || term;
+    try {
+      const translated = await translateWithLlamaCpp(gloss, [], {
+        ...settings, source: sourceLanguage, target: targetLanguage
+      }, signal);
+      entry.definitions = DictionaryLib.isTargetLanguage(translated, targetLanguage) ? [translated] : [];
+    } catch (error) { if (signal.aborted) throw error; entry.definitions = []; }
+  } else {
+    entry.definitions = entry.definitions.filter((value) => DictionaryLib.isTargetLanguage(value, targetLanguage));
+  }
+  if (entry.generatedExample && !DictionaryLib.isTargetLanguage(entry.generatedExampleTranslation, targetLanguage)) {
+    try {
+      const translated = await translateWithLlamaCpp(entry.generatedExample, [], {
+        ...settings, source: sourceLanguage, target: targetLanguage
+      }, signal);
+      entry.generatedExampleTranslation = DictionaryLib.isTargetLanguage(translated, targetLanguage) ? translated : "";
+    } catch (error) { if (signal.aborted) throw error; entry.generatedExampleTranslation = ""; }
+  }
+  if (!entry.generatedExample) entry.generatedExampleTranslation = "";
 }
 
 const ANKI_ACTIONS = new Set(["requestPermission", "version", "deckNames", "createDeck", "modelNames", "modelFieldNames", "modelFieldsOnTemplates", "canAddNotes", "addNote"]);
