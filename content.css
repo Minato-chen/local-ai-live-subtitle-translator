@@ -41,6 +41,7 @@
   width: min(330px, calc(100vw - 16px));
   max-height: min(520px, calc(100vh - 16px));
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 14px;
   border: 1px solid #555;
   border-radius: 10px;
@@ -54,6 +55,9 @@
   filter: none;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
+
+#nf-zh-overlay .nf-zh-dictionary[data-placement="above"] { transform-origin: bottom left; }
+#nf-zh-overlay .nf-zh-dictionary[data-placement="below"] { transform-origin: top left; }
 
 #nf-zh-overlay .nf-zh-anki-editor {
   left: 50%;

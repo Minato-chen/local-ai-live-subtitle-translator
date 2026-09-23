@@ -52,3 +52,4 @@ These checks are blocked in the current environment because Netflix/browser inte
 ## Post-release correction
 
 - Dictionary requests now use llama.cpp schema-constrained JSON output. This fixes “词典返回格式无效” responses from models that did not obey a prose-only JSON instruction.
+- Dictionary panels are measured after rendering and automatically move above bottom subtitles, remain inside the viewport, and scroll internally when space is limited.

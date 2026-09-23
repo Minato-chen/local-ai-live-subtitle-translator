@@ -46,6 +46,7 @@ let lookupRequestId = null;
 let lookupVersion = 0;
 let lastDictionaryEntry = null;
 let sessionDeck = "";
+let dictionaryAnchor = null;
 
 if (isTranslationPage()) init();
 
@@ -73,7 +74,7 @@ async function init() {
     characterData: true
   });
 
-  window.addEventListener("resize", () => positionOverlay(), { passive: true });
+  window.addEventListener("resize", () => { positionOverlay(); positionDictionaryPanel(); }, { passive: true });
   document.addEventListener("mouseup", handleSelectionMouseUp);
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeInteractivePanels(); });
   document.addEventListener("visibilitychange", () => { if (document.hidden) exitPausedInteraction(); });
@@ -451,9 +452,8 @@ function showDictionaryShell(rect, term, message) {
   const title = document.createElement("strong"); title.textContent = term;
   const status = document.createElement("p"); status.textContent = message;
   dictionaryPanel.append(title, status);
-  const left = Math.max(8, Math.min(window.innerWidth - 340, rect?.left || window.innerWidth / 2 - 160));
-  const top = Math.max(8, Math.min(window.innerHeight - 260, (rect?.bottom || window.innerHeight / 2) + 8));
-  dictionaryPanel.style.left = `${left}px`; dictionaryPanel.style.top = `${top}px`;
+  dictionaryAnchor = rect ? { left: rect.left, top: rect.top, bottom: rect.bottom } : null;
+  positionDictionaryPanel();
 }
 
 function renderDictionary(entry) {
@@ -468,6 +468,23 @@ function renderDictionary(entry) {
   appendLabeled(dictionaryPanel, uiText("视频原句", "Video sentence"), entry.videoSentence);
   if (entry.generatedExample) appendLabeled(dictionaryPanel, uiText("新例句", "New example"), `${entry.generatedExample}${entry.generatedExampleTranslation ? `\n${entry.generatedExampleTranslation}` : ""}`);
   if (settings.ankiEnabled) dictionaryPanel.append(panelButton(uiText("添加到 Anki", "Add to Anki"), () => openAnkiEditor(entry), "nf-zh-primary"));
+  positionDictionaryPanel();
+}
+
+function positionDictionaryPanel() {
+  if (!dictionaryPanel || dictionaryPanel.hidden || !dictionaryAnchor) return;
+  // Measure after rendering because definitions and examples change the height.
+  dictionaryPanel.style.maxHeight = `${Math.max(80, window.innerHeight - 16)}px`;
+  const measured = dictionaryPanel.getBoundingClientRect();
+  const position = SubtitleShared.computeFloatingPosition(
+    dictionaryAnchor,
+    { width: measured.width, height: measured.height },
+    { width: window.innerWidth, height: window.innerHeight }
+  );
+  dictionaryPanel.style.left = `${position.left}px`;
+  dictionaryPanel.style.top = `${position.top}px`;
+  dictionaryPanel.style.maxHeight = `${Math.min(position.maxHeight, window.innerHeight - 16)}px`;
+  dictionaryPanel.dataset.placement = position.placement;
 }
 
 function appendText(parent, text, className = "") { const p = document.createElement("p"); p.className = className; p.textContent = text || ""; parent.append(p); }
@@ -543,6 +560,7 @@ function closeInteractivePanels() {
   lookupVersion++;
   if (lookupRequestId) chrome.runtime?.sendMessage?.({ type: "CANCEL_LOOKUP", requestId: lookupRequestId }).catch(() => {});
   lookupRequestId = null; lastDictionaryEntry = null;
+  dictionaryAnchor = null;
   if (dictionaryPanel) { dictionaryPanel.hidden = true; dictionaryPanel.replaceChildren(); }
   if (editorPanel) { editorPanel.hidden = true; editorPanel.replaceChildren(); }
 }

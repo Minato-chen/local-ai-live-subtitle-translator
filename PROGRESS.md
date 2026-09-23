@@ -63,3 +63,10 @@
 - Added `response_format: { type: "json_object", schema: ... }` with a closed, required dictionary schema. This makes llama.cpp constrain generation to valid JSON instead of relying only on model instruction-following.
 - Added a narrowly scoped fallback for older compatible servers that explicitly reject the structured-output parameter; malformed model output is not retried silently.
 - Regression suite: 18/18 tests passing.
+
+## Post-release fix — Dictionary viewport positioning
+
+- Replaced the fixed estimated offset with measured positioning after every dictionary render.
+- The panel now chooses the side with enough space (normally above bottom subtitles), clamps horizontally and vertically to an 8 px viewport margin, and uses internal scrolling when neither side can fit the full content.
+- Window resizing recomputes the position; overscroll is contained inside the panel.
+- Regression suite: 20/20 tests passing, including bottom-subtitle and small-viewport cases.
