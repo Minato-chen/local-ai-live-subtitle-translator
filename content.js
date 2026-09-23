@@ -13,26 +13,57 @@ const DEFAULTS = {
   backgroundColor: "#000000",
   backgroundOpacity: 40,
   position: "above",
-  uiLanguage: "zh"
+  uiLanguage: "zh",
+  dictionaryEnabled: true,
+  ankiEnabled: false,
+  ankiUrl: "http://127.0.0.1:8765",
+  ankiDeck: "Default",
+  ankiModel: "Basic",
+  ankiFieldMap: { term: "Front", cardBack: "Back" },
+  ankiTags: "subtitle-learning"
 };
 
 const cache = new Map();
+const fragmentTranslationCache = new Map();
 const subtitleHistory = [];
+const requestNamespace = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 let settings = { ...DEFAULTS };
 let lastSource = "";
+let translatedSource = "";
 let requestVersion = 0;
 let debounceTimer;
 let translationInFlight = false;
 let queuedTranslation = null;
 let activeRequestId = null;
 let nextRequestId = 0;
+let activeFragmentRequestId = null;
 let extensionContextInvalid = false;
 let overlay;
 let translatedLine;
 let sourceLine;
 let statusLine;
+let dictionaryPanel;
+let editorPanel;
+let activeVideo = null;
+let videoPaused = false;
+let lookupRequestId = null;
+let lookupVersion = 0;
+let lastDictionaryEntry = null;
+let sessionDeck = "";
+let dictionaryAnchor = null;
+let wordBlockParts = null;
+let blockDrag = null;
+let lastPageKey = "";
 
 if (isTranslationPage()) init();
+else {
+  const navigationObserver = new MutationObserver(() => {
+    if (!isTranslationPage()) return;
+    navigationObserver.disconnect();
+    init();
+  });
+  navigationObserver.observe(document.documentElement, { childList: true, subtree: true });
+}
 
 function isTranslationPage() {
   const host = location.hostname;
@@ -43,10 +74,12 @@ function isTranslationPage() {
 
 async function init() {
   settings = await chrome.storage.sync.get(DEFAULTS);
+  lastPageKey = location.pathname + location.search;
   createOverlay();
   chrome.storage.onChanged.addListener((changes) => {
     for (const [key, value] of Object.entries(changes)) settings[key] = value.newValue;
     cache.clear();
+    fragmentTranslationCache.clear();
     subtitleHistory.length = 0;
     applySettings();
     scanSubtitles();
@@ -58,7 +91,12 @@ async function init() {
     characterData: true
   });
 
-  window.addEventListener("resize", () => positionOverlay(), { passive: true });
+  window.addEventListener("resize", () => { positionOverlay(); positionDictionaryPanel(); }, { passive: true });
+  document.addEventListener("mouseup", handleSelectionMouseUp);
+  sourceLine.addEventListener("mousedown", beginWordBlockDrag);
+  document.addEventListener("mousemove", updateWordBlockDrag);
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeInteractivePanels(); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) exitPausedInteraction(); });
   setInterval(scanSubtitles, 500);
   scanSubtitles();
 }
@@ -70,11 +108,15 @@ function createOverlay() {
     <div class="nf-zh-source"></div>
     <div class="nf-zh-translation"></div>
     <div class="nf-zh-status"></div>
+    <section class="nf-zh-dictionary" hidden></section>
+    <section class="nf-zh-anki-editor" hidden></section>
   `;
   document.documentElement.appendChild(overlay);
   sourceLine = overlay.querySelector(".nf-zh-source");
   translatedLine = overlay.querySelector(".nf-zh-translation");
   statusLine = overlay.querySelector(".nf-zh-status");
+  dictionaryPanel = overlay.querySelector(".nf-zh-dictionary");
+  editorPanel = overlay.querySelector(".nf-zh-anki-editor");
   applySettings();
 }
 
@@ -82,7 +124,7 @@ function applySettings() {
   if (!overlay) return;
   overlay.style.setProperty("--nf-zh-font-size", `${Number(settings.fontSize) || 28}px`);
   overlay.classList.toggle("nf-zh-disabled", !settings.enabled);
-  sourceLine.classList.add("nf-zh-hidden");
+  updatePausedUi();
   translatedLine.style.color = settings.textColor || "#ffffff";
   translatedLine.style.webkitTextStroke = settings.outlineEnabled
     ? `${Number(settings.outlineWidth) || 2}px ${settings.outlineColor || "#000000"}`
@@ -123,9 +165,28 @@ function readSubtitle(container) {
   return text;
 }
 
+function recentTranslationContext() {
+  const count = Math.max(0, Math.min(8, Number(settings.contextLines) || 0));
+  return count ? subtitleHistory.slice(-count) : [];
+}
+
 function scanSubtitles() {
   if (extensionContextInvalid) return;
   if (!settings.enabled || !overlay) return;
+  const pageKey = location.pathname + location.search;
+  if (pageKey !== lastPageKey) {
+    lastPageKey = pageKey;
+    if (lastSource) clearSubtitle();
+    subtitleHistory.length = 0;
+    cache.clear();
+    fragmentTranslationCache.clear();
+    return;
+  }
+  if (!isTranslationPage()) {
+    if (lastSource) clearSubtitle();
+    return;
+  }
+  bindPrimaryVideo();
   const container = findSubtitleContainer();
   if (!container) {
     if (lastSource) clearSubtitle();
@@ -135,12 +196,15 @@ function scanSubtitles() {
   positionOverlay(container);
   const text = readSubtitle(container);
   if (!text || text === lastSource) return;
+  if (lastSource) closeInteractivePanels();
   lastSource = text;
+  translatedSource = "";
   const version = ++requestVersion;
-  sourceLine.textContent = text;
+  renderSourceLine(text);
+  updatePausedUi();
   translatedLine.textContent = "...";
   statusLine.textContent = "";
-  const context = subtitleHistory.slice(-Math.max(0, Number(settings.contextLines) || 0));
+  const context = recentTranslationContext();
   subtitleHistory.push(text);
   if (subtitleHistory.length > 20) subtitleHistory.shift();
 
@@ -165,7 +229,7 @@ async function requestTranslation(text, context, version) {
     return;
   }
   translationInFlight = true;
-  const requestId = `subtitle-${++nextRequestId}`;
+  const requestId = `subtitle-${requestNamespace}-${++nextRequestId}`;
   activeRequestId = requestId;
   try {
     await translateOne(text, context, version, requestId);
@@ -221,6 +285,7 @@ async function translateOne(text, context, version, requestId) {
 
 function showTranslation(text, version) {
   if (version !== requestVersion) return;
+  translatedSource = lastSource;
   translatedLine.textContent = text;
   statusLine.textContent = "";
   positionOverlay();
@@ -311,7 +376,17 @@ function positionYouTubeOverlay(player) {
     return;
   }
   if (settings.position === "bottom") {
-    overlay.style.bottom = `${Math.max(8, viewportHeight - rect.bottom + padding)}px`;
+    const visibleCaptionBounds = (selector) => [...player.querySelectorAll(selector)]
+      .filter((node) => node.textContent.trim())
+      .map((node) => node.getBoundingClientRect())
+      .filter((bounds) => bounds.height > 0 && bounds.bottom > rect.top && bounds.top < rect.bottom);
+    const captionBounds = visibleCaptionBounds(".caption-window");
+    if (!captionBounds.length) captionBounds.push(...visibleCaptionBounds(".ytp-caption-segment"));
+    const captionRect = captionBounds.length
+      ? { top: Math.min(...captionBounds.map((bounds) => bounds.top)), bottom: Math.max(...captionBounds.map((bounds) => bounds.bottom)) }
+      : null;
+    const height = overlay.getBoundingClientRect().height;
+    overlay.style.top = `${SubtitleShared.computeCaptionSafeTop(rect, captionRect, height, viewportHeight, padding)}px`;
     return;
   }
 
@@ -327,4 +402,366 @@ function clearSubtitle() {
   sourceLine.textContent = "";
   translatedLine.textContent = "";
   statusLine.textContent = "";
+  closeInteractivePanels();
+}
+
+function findPrimaryVideo() {
+  return [...document.querySelectorAll("video")]
+    .map((video) => ({ video, rect: video.getBoundingClientRect() }))
+    .filter(({ rect }) => rect.width > 0 && rect.height > 0)
+    .sort((a, b) => b.rect.width * b.rect.height - a.rect.width * a.rect.height)[0]?.video || null;
+}
+
+function bindPrimaryVideo() {
+  const next = findPrimaryVideo();
+  if (next === activeVideo) { syncVideoState(); return; }
+  if (activeVideo) {
+    activeVideo.removeEventListener("play", syncVideoState);
+    activeVideo.removeEventListener("pause", syncVideoState);
+    activeVideo.removeEventListener("ended", syncVideoState);
+    activeVideo.removeEventListener("emptied", syncVideoState);
+  }
+  activeVideo = next;
+  if (activeVideo) {
+    activeVideo.addEventListener("play", syncVideoState);
+    activeVideo.addEventListener("pause", syncVideoState);
+    activeVideo.addEventListener("ended", syncVideoState);
+    activeVideo.addEventListener("emptied", syncVideoState);
+  }
+  syncVideoState();
+}
+
+function syncVideoState() {
+  const nextPaused = Boolean(activeVideo && activeVideo.paused && !activeVideo.ended && activeVideo.readyState > 0 && !document.hidden);
+  if (videoPaused === nextPaused) return;
+  videoPaused = nextPaused;
+  if (!videoPaused) exitPausedInteraction();
+  updatePausedUi();
+}
+
+function updatePausedUi() {
+  if (!overlay || !sourceLine) return;
+  const interactive = Boolean(settings.enabled && settings.dictionaryEnabled && videoPaused && lastSource);
+  overlay.classList.toggle("nf-zh-paused", interactive);
+  sourceLine.classList.toggle("nf-zh-hidden", !interactive);
+  if (!interactive) {
+    blockDrag = null;
+    sourceLine.querySelectorAll(".nf-zh-word-selected").forEach((node) => node.classList.remove("nf-zh-word-selected"));
+    closeInteractivePanels();
+  }
+}
+
+function exitPausedInteraction() {
+  videoPaused = false;
+  blockDrag = null;
+  sourceLine?.querySelectorAll(".nf-zh-word-selected").forEach((node) => node.classList.remove("nf-zh-word-selected"));
+  const selection = globalThis.getSelection?.();
+  if (selectionInsideOverlay(selection)) selection.removeAllRanges();
+  closeInteractivePanels();
+}
+
+function selectionBelongsToSource(selection) {
+  if (!selection || selection.rangeCount !== 1 || selection.isCollapsed) return false;
+  const range = selection.getRangeAt(0);
+  return sourceLine.contains(range.commonAncestorContainer);
+}
+
+function selectionInsideOverlay(selection) {
+  if (!selection || !selection.rangeCount || !overlay) return false;
+  return overlay.contains(selection.anchorNode) || overlay.contains(selection.focusNode);
+}
+
+function handleSelectionMouseUp(event) {
+  if (!videoPaused || !settings.dictionaryEnabled || event.target.closest?.(".nf-zh-dictionary, .nf-zh-anki-editor")) {
+    blockDrag = null;
+    return;
+  }
+  if (blockDrag) {
+    const drag = blockDrag;
+    blockDrag = null;
+    const token = event.target.closest?.(".nf-zh-word-block");
+    sourceLine.querySelectorAll(".nf-zh-word-selected").forEach((node) => node.classList.remove("nf-zh-word-selected"));
+    if ((!token && event.target !== sourceLine) || drag.source !== lastSource) return;
+    if (token && !sourceLine.contains(token)) return;
+    const end = token ? Number(token.dataset.blockIndex) : drag.end;
+    const term = SubtitleShared.wordBlockRange(wordBlockParts, drag.start, end);
+    if (term) {
+      const rect = blockRangeRect(drag.start, end);
+      if (drag.start === end) startSelectedLookup(term, lastSource, rect, "word");
+      else startSelectedLookup(term, lastSource, rect, "phrase");
+    }
+    return;
+  }
+  if (wordBlockParts) return;
+  const selection = globalThis.getSelection?.();
+  if (!selectionBelongsToSource(selection)) return;
+  const term = SubtitleShared.normalizeSelection(selection.toString());
+  if (!term) return;
+  const rect = selection.getRangeAt(0).getBoundingClientRect();
+  startSelectedLookup(term, lastSource, rect, "auto");
+}
+
+function renderSourceLine(text) {
+  blockDrag = null;
+  wordBlockParts = SubtitleShared.tokenizeWordBlocks(text);
+  sourceLine.classList.toggle("nf-zh-block-mode", Boolean(wordBlockParts));
+  if (!wordBlockParts) { sourceLine.textContent = text; return; }
+  const fragment = document.createDocumentFragment();
+  wordBlockParts.forEach((part, index) => {
+    if (!part.word) { fragment.append(document.createTextNode(part.text)); return; }
+    const span = document.createElement("span");
+    span.className = "nf-zh-word-block";
+    span.dataset.blockIndex = String(index);
+    span.textContent = part.text;
+    fragment.append(span);
+  });
+  sourceLine.replaceChildren(fragment);
+}
+
+function beginWordBlockDrag(event) {
+  if (!videoPaused || !settings.dictionaryEnabled || !wordBlockParts || event.button !== 0) return;
+  const token = event.target.closest?.(".nf-zh-word-block");
+  if (!token) return;
+  event.preventDefault();
+  const start = Number(token.dataset.blockIndex);
+  blockDrag = { start, end: start, source: lastSource };
+  token.classList.add("nf-zh-word-selected");
+}
+
+function updateWordBlockDrag(event) {
+  if (!blockDrag) return;
+  const token = event.target.closest?.(".nf-zh-word-block");
+  if (!token || !sourceLine.contains(token)) return;
+  blockDrag.end = Number(token.dataset.blockIndex);
+  const low = Math.min(blockDrag.start, blockDrag.end); const high = Math.max(blockDrag.start, blockDrag.end);
+  sourceLine.querySelectorAll(".nf-zh-word-block").forEach((node) => {
+    const index = Number(node.dataset.blockIndex);
+    node.classList.toggle("nf-zh-word-selected", index >= low && index <= high);
+  });
+}
+
+function blockRangeRect(start, end) {
+  const first = sourceLine.querySelector(`[data-block-index="${Math.min(start, end)}"]`);
+  const last = sourceLine.querySelector(`[data-block-index="${Math.max(start, end)}"]`);
+  if (!first || !last) return sourceLine.getBoundingClientRect();
+  const a = first.getBoundingClientRect(); const b = last.getBoundingClientRect();
+  return { left: Math.min(a.left, b.left), top: Math.min(a.top, b.top), right: Math.max(a.right, b.right), bottom: Math.max(a.bottom, b.bottom) };
+}
+
+function uiText(zh, en) { return settings.uiLanguage === "en" ? en : zh; }
+
+function startSelectedLookup(term, sentence, rect, kind) {
+  const issue = SubtitleShared.selectionIssue(term, kind);
+  if (issue) { showDictionaryShell(rect, term, issue); return; }
+  requestDictionary(term, sentence, rect, kind);
+}
+
+async function requestDictionary(term, sentence, rect, kind = "word") {
+  const version = ++lookupVersion;
+  cancelActiveFragmentTranslation();
+  lastDictionaryEntry = null;
+  if (lookupRequestId) chrome.runtime.sendMessage({ type: "CANCEL_LOOKUP", requestId: lookupRequestId }).catch(() => {});
+  lookupRequestId = `lookup-${requestNamespace}-${version}`;
+  showDictionaryShell(rect, term, uiText("正在查询…", "Looking up…"));
+  try {
+    const context = subtitleHistory.slice(0, -1).slice(-8);
+    const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, sentence, context, source: settings.source, target: settings.target });
+    if (version !== lookupVersion || !videoPaused) return;
+    if (!response?.ok) throw new Error(response?.error || uiText("查词失败", "Lookup failed"));
+    lastDictionaryEntry = {
+      ...response.entry,
+      videoSentence: sentence,
+      videoSentenceTranslation: "",
+      sourceTitle: document.title
+    };
+    renderDictionary(lastDictionaryEntry);
+    await translateDictionaryFragment(lastDictionaryEntry, version);
+  } catch (error) {
+    if (version !== lookupVersion || !videoPaused) return;
+    renderPanelMessage(dictionaryPanel, error.message, true);
+  }
+}
+
+async function translateDictionaryFragment(entry, version) {
+  const sentence = entry.videoSentence;
+  const key = JSON.stringify([settings.serviceUrl, settings.source, settings.target, sentence]);
+  let requestId = null;
+  try {
+    let translation = fragmentTranslationCache.get(key);
+    if (!translation) {
+      requestId = `fragment-${requestNamespace}-${++nextRequestId}`;
+      activeFragmentRequestId = requestId;
+      const response = await chrome.runtime.sendMessage({
+        type: "TRANSLATE_FRAGMENT", requestId, text: sentence, source: settings.source, target: settings.target
+      });
+      if (version !== lookupVersion || !videoPaused || lastDictionaryEntry !== entry) return;
+      if (!response?.ok) throw new Error(response?.error || "片段翻译失败");
+      translation = response.translatedText;
+      fragmentTranslationCache.set(key, translation);
+      if (fragmentTranslationCache.size > 200) fragmentTranslationCache.delete(fragmentTranslationCache.keys().next().value);
+    }
+    if (version !== lookupVersion || !videoPaused || lastDictionaryEntry !== entry) return;
+    entry.videoSentenceTranslation = translation;
+    if (!dictionaryPanel.hidden) renderDictionary(entry);
+    const editorTranslation = editorPanel?.querySelector('[name="videoTranslation"]');
+    if (editorTranslation && !editorTranslation.value) editorTranslation.value = translation;
+  } catch (error) {
+    if (version !== lookupVersion || lastDictionaryEntry !== entry) return;
+    if (!dictionaryPanel.hidden) {
+      const note = document.createElement("p");
+      note.className = "nf-zh-error";
+      note.textContent = uiText("片段译文暂不可用，可手动编辑 Anki 卡片", "Fragment translation unavailable; you can edit the Anki card");
+      dictionaryPanel.append(note);
+      positionDictionaryPanel();
+    }
+  } finally {
+    if (activeFragmentRequestId === requestId) activeFragmentRequestId = null;
+  }
+}
+
+function cancelActiveFragmentTranslation() {
+  if (!activeFragmentRequestId) return;
+  const requestId = activeFragmentRequestId;
+  activeFragmentRequestId = null;
+  chrome.runtime?.sendMessage?.({ type: "CANCEL_FRAGMENT_TRANSLATION", requestId }).catch(() => {});
+}
+
+function showDictionaryShell(rect, term, message) {
+  editorPanel.hidden = true;
+  dictionaryPanel.hidden = false;
+  dictionaryPanel.replaceChildren();
+  const header = document.createElement("div"); header.className = "nf-zh-panel-header";
+  const title = document.createElement("strong"); title.textContent = term;
+  const status = document.createElement("p"); status.textContent = message;
+  header.append(title, panelButton("×", closeInteractivePanels, "nf-zh-close"));
+  dictionaryPanel.append(header, status);
+  dictionaryAnchor = rect ? { left: rect.left, top: rect.top, bottom: rect.bottom } : null;
+  positionDictionaryPanel();
+}
+
+function renderDictionary(entry) {
+  dictionaryPanel.replaceChildren();
+  const header = document.createElement("div"); header.className = "nf-zh-panel-header";
+  const word = document.createElement("strong"); word.textContent = entry.term;
+  const close = panelButton("×", closeInteractivePanels, "nf-zh-close"); header.append(word, close);
+  dictionaryPanel.append(header);
+  appendLabeled(dictionaryPanel, uiText("释义", "Meaning"), entry.meaning);
+  appendBilingualExample(dictionaryPanel, uiText("视频原句", "Video sentence"), entry.videoSentence, entry.videoSentenceTranslation);
+  dictionaryPanel.append(panelButton(
+    settings.ankiEnabled ? uiText("添加到 Anki", "Add to Anki") : uiText("设置 Anki", "Set up Anki"),
+    () => settings.ankiEnabled ? openAnkiEditor(entry) : openAnkiSettings(),
+    "nf-zh-primary"
+  ));
+  positionDictionaryPanel();
+}
+
+async function openAnkiSettings() {
+  const response = await chrome.runtime.sendMessage({ type: "OPEN_OPTIONS" });
+  if (!response?.ok) renderPanelMessage(dictionaryPanel, response?.error || uiText("无法打开设置", "Could not open settings"), true);
+}
+
+function positionDictionaryPanel() {
+  if (!dictionaryPanel || dictionaryPanel.hidden || !dictionaryAnchor) return;
+  // Measure after rendering because definitions and examples change the height.
+  dictionaryPanel.style.maxHeight = `${Math.max(80, window.innerHeight - 16)}px`;
+  const measured = dictionaryPanel.getBoundingClientRect();
+  const position = SubtitleShared.computeFloatingPosition(
+    dictionaryAnchor,
+    { width: measured.width, height: measured.height },
+    { width: window.innerWidth, height: window.innerHeight }
+  );
+  dictionaryPanel.style.left = `${position.left}px`;
+  dictionaryPanel.style.top = `${position.top}px`;
+  dictionaryPanel.style.maxHeight = `${Math.min(position.maxHeight, window.innerHeight - 16)}px`;
+  dictionaryPanel.dataset.placement = position.placement;
+}
+
+function appendText(parent, text, className = "") { const p = document.createElement("p"); p.className = className; p.textContent = text || ""; parent.append(p); }
+function appendLabeled(parent, label, text) { if (!text) return; const wrap = document.createElement("div"); const strong = document.createElement("b"); strong.textContent = label; const p = document.createElement("p"); p.textContent = text; wrap.append(strong, p); parent.append(wrap); }
+function appendBilingualExample(parent, label, original, translation) {
+  if (!original && !translation) return;
+  const wrap = document.createElement("div"); wrap.className = "nf-zh-example";
+  const strong = document.createElement("b"); strong.textContent = label; wrap.append(strong);
+  if (original) appendText(wrap, original, "nf-zh-example-original");
+  if (translation && translation !== original) {
+    const translated = document.createElement("p"); translated.className = "nf-zh-example-translation";
+    const label = document.createElement("span"); label.className = "nf-zh-example-label"; label.textContent = uiText("译文：", "Translation: ");
+    const text = document.createElement("span"); text.textContent = translation;
+    translated.append(label, text); wrap.append(translated);
+  }
+  parent.append(wrap);
+}
+function panelButton(label, handler, className = "") { const button = document.createElement("button"); button.type = "button"; button.className = className; button.textContent = label; button.addEventListener("click", handler); return button; }
+function renderPanelMessage(panel, message, error = false) { panel.replaceChildren(); const p = document.createElement("p"); p.className = error ? "nf-zh-error" : ""; p.textContent = message; panel.append(p, panelButton("×", closeInteractivePanels, "nf-zh-close")); }
+
+async function openAnkiEditor(entry) {
+  if (!videoPaused) return;
+  dictionaryPanel.hidden = true; editorPanel.hidden = false; editorPanel.replaceChildren();
+  const heading = document.createElement("div"); heading.className = "nf-zh-panel-header";
+  const title = document.createElement("strong"); title.textContent = uiText("添加到 Anki", "Add to Anki"); heading.append(title, panelButton("×", closeInteractivePanels, "nf-zh-close")); editorPanel.append(heading);
+  const deck = addEditorField("deck", uiText("牌组", "Deck"), sessionDeck || settings.ankiDeck, "select");
+  const fields = {
+    term: addEditorField("term", uiText("词语", "Term"), entry.term),
+    meaning: addEditorField("meaning", uiText("释义", "Meaning"), entry.meaning, "textarea"),
+    videoSentence: addEditorField("videoSentence", uiText("视频原句", "Video sentence"), entry.videoSentence, "textarea"),
+    videoTranslation: addEditorField("videoTranslation", uiText("视频原句译文", "Video sentence translation"), entry.videoSentenceTranslation, "textarea"),
+    tags: addEditorField("tags", uiText("标签", "Tags"), [settings.ankiTags, ...SubtitleShared.sourceTags(entry.sourceTitle, location.hostname)].filter(Boolean).join(" "))
+  };
+  const newDeck = panelButton(uiText("新建牌组", "New deck"), () => createDeckFromEditor(deck), "nf-zh-secondary");
+  const submit = panelButton(uiText("确认添加", "Confirm add"), () => submitAnkiNote(deck, fields, submit), "nf-zh-primary");
+  editorPanel.append(newDeck, submit);
+  try {
+    const decks = await ankiAction("deckNames");
+    deck.replaceChildren(...decks.map((name) => { const option = document.createElement("option"); option.value = option.textContent = name; return option; }));
+    deck.value = sessionDeck || settings.ankiDeck;
+    if (!deck.value && decks[0]) deck.value = decks[0];
+  } catch (error) { renderEditorStatus(error.message, true); }
+}
+
+function addEditorField(name, labelText, value, kind = "input") {
+  const label = document.createElement("label"); label.textContent = labelText;
+  const field = kind === "textarea" ? document.createElement("textarea") : kind === "select" ? document.createElement("select") : document.createElement("input");
+  field.name = name; if (kind !== "select") field.value = value || ""; label.append(field); editorPanel.append(label); return field;
+}
+
+async function createDeckFromEditor(deckSelect) {
+  const name = prompt(uiText("请输入新牌组名称，例如 Subtitle Learning::影片名", "Enter a new deck name, e.g. Subtitle Learning::Movie"));
+  if (!name?.trim()) return;
+  try { await ankiAction("createDeck", { deck: name.trim() }); const option = document.createElement("option"); option.value = option.textContent = name.trim(); deckSelect.append(option); deckSelect.value = name.trim(); renderEditorStatus(uiText("牌组已创建", "Deck created")); } catch (error) { renderEditorStatus(error.message, true); }
+}
+
+async function submitAnkiNote(deck, fields, button) {
+  if (button.disabled) return; button.disabled = true;
+  try {
+    const values = Object.fromEntries(Object.entries(fields).filter(([key]) => key !== "tags").map(([key, field]) => [key, field.value]));
+    const tags = fields.tags.value.split(/\s+/).filter(Boolean);
+    const note = AnkiLib.buildNote({ deckName: deck.value, modelName: "Basic", fieldMap: { term: "Front", cardBack: "Back" }, values, tags });
+    const response = await chrome.runtime.sendMessage({ type: "ADD_ANKI_NOTE", note, ankiUrl: settings.ankiUrl });
+    if (!response?.ok) throw new Error(response?.error || uiText("添加失败", "Add failed"));
+    const noteId = response.noteId;
+    sessionDeck = deck.value;
+    renderPanelMessage(editorPanel, uiText(`已添加到 Anki（${noteId}）`, `Added to Anki (${noteId})`));
+  } catch (error) { renderEditorStatus(error.message, true); button.disabled = false; }
+}
+
+async function ankiAction(action, params = {}) {
+  const response = await chrome.runtime.sendMessage({ type: "ANKI_ACTION", action, params, ankiUrl: settings.ankiUrl });
+  if (!response?.ok) throw new Error(response?.error || "AnkiConnect error");
+  return response.result;
+}
+
+function renderEditorStatus(message, error = false) {
+  let status = editorPanel.querySelector(".nf-zh-editor-status");
+  if (!status) { status = document.createElement("p"); status.className = "nf-zh-editor-status"; editorPanel.append(status); }
+  status.classList.toggle("nf-zh-error", error); status.textContent = message;
+}
+
+function closeInteractivePanels() {
+  lookupVersion++;
+  cancelActiveFragmentTranslation();
+  if (lookupRequestId) chrome.runtime?.sendMessage?.({ type: "CANCEL_LOOKUP", requestId: lookupRequestId }).catch(() => {});
+  lookupRequestId = null; lastDictionaryEntry = null;
+  dictionaryAnchor = null;
+  if (dictionaryPanel) { dictionaryPanel.hidden = true; dictionaryPanel.replaceChildren(); }
+  if (editorPanel) { editorPanel.hidden = true; editorPanel.replaceChildren(); }
 }

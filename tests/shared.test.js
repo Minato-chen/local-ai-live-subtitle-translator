@@ -1,0 +1,25 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const s = require("../lib/shared.js");
+test("normalizes multilingual selections", () => { assert.equal(s.normalizeSelection("  “hello-world!” "), "hello-world"); assert.equal(s.normalizeSelection("「日本語」"), "日本語"); });
+test("tokenizes spaced subtitles into complete selectable words", () => { const parts = s.tokenizeWordBlocks("—Are you on the needle? — Neither."); assert.equal(parts.map((part) => part.text).join(""), "—Are you on the needle? — Neither."); assert.equal(s.wordBlockRange(parts, 0, 0), "Are"); assert.equal(s.wordBlockRange(parts, 4, 6), "on the"); assert.equal(s.wordBlockRange(parts, parts.length - 1, parts.length - 1), "Neither"); assert.equal(s.tokenizeWordBlocks("これはテストです"), null); assert.equal(s.tokenizeWordBlocks("한국어 자막"), null); });
+test("limits lookup to words and short within-sentence phrases", () => { assert.equal(s.selectionIssue("kept", "word"), ""); assert.equal(s.selectionIssue("keep up with", "phrase"), ""); assert.match(s.selectionIssue("my fault. Bogdan just", "phrase"), /跨越句子边界/); assert.match(s.selectionIssue("this is a full sentence", "word"), /不像单词/); assert.match(s.selectionIssue("one two three four five six seven", "phrase"), /过长/); });
+test("auto lookup rejects long or cross-sentence selections", () => { assert.equal(s.selectionIssue("気にする", "auto"), ""); assert.match(s.selectionIssue("はい。次の話", "auto"), /跨越句子边界/); assert.match(s.selectionIssue("one two three four five six seven", "auto"), /過长|过长/); });
+test("rejects invalid selection", () => { assert.equal(s.normalizeSelection(""), ""); assert.equal(s.normalizeSelection("x".repeat(81)), ""); });
+test("accepts loopback only", () => { assert.equal(s.validateLoopbackHttpUrl("http://127.0.0.1:8765"), "http://127.0.0.1:8765"); assert.throws(() => s.validateLoopbackHttpUrl("https://example.com")); });
+test("accepts IPv6 loopback and rejects credentials", () => { assert.equal(s.validateLoopbackHttpUrl("http://[::1]:8765"), "http://[::1]:8765"); assert.throws(() => s.validateLoopbackHttpUrl("http://user@localhost:8765"), /账号/); });
+test("escapes Anki HTML", () => assert.equal(s.toAnkiHtml("<b>x</b>\ny"), "&lt;b&gt;x&lt;/b&gt;<br>y"));
+test("builds privacy-preserving source tags", () => assert.deepEqual(s.sourceTags("My Movie!", "www.youtube.com"), ["source-youtube", "title-my-movie"]));
+test("places a tall dictionary above bottom subtitles", () => { const p = s.computeFloatingPosition({ left: 900, top: 650, bottom: 680 }, { width: 330, height: 400 }, { width: 1200, height: 720 }); assert.equal(p.placement, "above"); assert.ok(p.top >= 8); assert.ok(p.left + 330 <= 1192); });
+test("clamps a dictionary inside a small viewport", () => { const p = s.computeFloatingPosition({ left: -20, top: 100, bottom: 120 }, { width: 500, height: 500 }, { width: 320, height: 240 }); assert.equal(p.left, 8); assert.ok(p.top >= 8); assert.ok(p.maxHeight >= 80); });
+test("bottom placement follows moving YouTube captions", () => {
+  const player = { top: 0, bottom: 600 };
+  const lowCaption = { top: 520, bottom: 565 };
+  const raisedCaption = { top: 430, bottom: 475 };
+  const lowTop = s.computeCaptionSafeTop(player, lowCaption, 70, 700, 12);
+  const raisedTop = s.computeCaptionSafeTop(player, raisedCaption, 70, 700, 12);
+  assert.ok(lowTop + 70 <= lowCaption.top - 8);
+  assert.ok(raisedTop + 70 <= raisedCaption.top - 8);
+  assert.ok(raisedTop < lowTop);
+  assert.equal(s.computeCaptionSafeTop(player, null, 70, 700, 12), 518);
+});

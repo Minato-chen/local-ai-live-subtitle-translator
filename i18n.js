@@ -18,7 +18,31 @@ Object.assign(I18N.en, {
   "。可修改端口，但服务必须运行在本机，并提供 OpenAI 兼容接口。": ". You may change the port, but the service must run locally and provide an OpenAI-compatible API.",
   "如果未安装 llama.cpp，请按照": "If llama.cpp is not installed, please follow the",
   "安装指南 (README)": "Installation Guide (README)",
-  "进行安装。": "to install it."
+  "进行安装。": "to install it.",
+  "暂停视频后可选择原字幕查词，并按需添加到 Anki。": "Pause the video to select words in the original subtitle and optionally add them to Anki.",
+  "暂停查词与 Anki": "Paused lookup and Anki",
+  "启用暂停查词": "Enable lookup while paused",
+  "视频暂停时选择原字幕中的单词或短语，通过当前本地 AI 服务查看释义、视频原句及译文。": "While paused, select a word or phrase in the original subtitle to see a local-AI definition, video sentence, and translation.",
+  "启用 Anki 集成": "Enable Anki integration",
+  "AnkiConnect 地址": "AnkiConnect URL",
+  "连接并刷新": "Connect and refresh",
+  "默认牌组": "Default deck",
+  "默认牌组（任意牌组均可选）": "Default deck (any deck)",
+  "笔记类型": "Note type",
+  "字段映射": "Field mapping",
+  "正面单词字段": "Front word field",
+  "背面内容字段": "Back content field",
+  "词性": "Part of speech",
+  "出处（可删）": "Reference (optional)",
+  "释义、视频原句与译文将拼接写入一个背面字段。所选笔记类型的卡片模板须在正反面显示这两个字段。": "The meaning, video sentence, and translation are combined into one back field. The card template must display the selected fields on the respective sides.",
+  "词语字段": "Term field",
+  "释义字段": "Meaning field",
+  "视频原句字段": "Video sentence field",
+  "视频原句译文字段": "Video sentence translation field",
+  "来源字段": "Source field",
+  "默认标签": "Default tags",
+  "牌组可以混放多种笔记类型，因此所有牌组均可选择；本扩展新建的卡片固定使用 Basic（Front / Back），不会更改牌组中已有的其他卡片。其他笔记类型在右侧列表中置灰，并标注“目前只支持 Basic”。": "A deck may contain mixed note types, so you can select any deck. This extension creates only Basic notes (Front / Back) and does not change existing cards. Other note types are disabled and labeled 'Basic only' in the selector.",
+  "需安装 AnkiConnect 并保持 Anki Desktop 运行。默认使用一个长期牌组；添加卡片时可以临时切换或手动新建影片子牌组。": "Install AnkiConnect and keep Anki Desktop running. A long-lived default deck is used; you can switch or create a movie subdeck while adding a note."
 });
 
 async function initI18n() {
