@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const s = require("../lib/shared.js");
 test("normalizes multilingual selections", () => { assert.equal(s.normalizeSelection("  “hello-world!” "), "hello-world"); assert.equal(s.normalizeSelection("「日本語」"), "日本語"); });
+test("tokenizes spaced subtitles into complete selectable words", () => { const parts = s.tokenizeWordBlocks("—Are you on the needle? — Neither."); assert.equal(parts.map((part) => part.text).join(""), "—Are you on the needle? — Neither."); assert.equal(s.wordBlockRange(parts, 0, 0), "Are"); assert.equal(s.wordBlockRange(parts, 4, 6), "on the"); assert.equal(s.wordBlockRange(parts, parts.length - 1, parts.length - 1), "Neither"); assert.equal(s.tokenizeWordBlocks("これはテストです"), null); assert.equal(s.tokenizeWordBlocks("한국어 자막"), null); });
 test("rejects invalid selection", () => { assert.equal(s.normalizeSelection(""), ""); assert.equal(s.normalizeSelection("x".repeat(81)), ""); });
 test("accepts loopback only", () => { assert.equal(s.validateLoopbackHttpUrl("http://127.0.0.1:8765"), "http://127.0.0.1:8765"); assert.throws(() => s.validateLoopbackHttpUrl("https://example.com")); });
 test("accepts IPv6 loopback and rejects credentials", () => { assert.equal(s.validateLoopbackHttpUrl("http://[::1]:8765"), "http://[::1]:8765"); assert.throws(() => s.validateLoopbackHttpUrl("http://user@localhost:8765"), /账号/); });

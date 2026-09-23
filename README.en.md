@@ -50,7 +50,7 @@ The settings page has three sections:
 
 ## Lookup While Paused
 
-Enable paused lookup, then pause a video to reveal the current original subtitle retained by the extension. Select a word or phrase to ask the same local AI service for a concise definition, its meaning in the video sentence, and a separate generated example. Playback, Escape, or a subtitle change closes the panel. No lookup request is made while the video is playing, and playback controls remain unobstructed.
+Enable paused lookup, then pause a video to reveal the current original subtitle retained by the extension. For space-delimited subtitles such as English, click a whole-word block or drag across blocks for a continuous phrase; Japanese, Korean, and similar subtitles retain native text selection. Lookup asks the same local AI service for a concise definition, its meaning in the video sentence, and a separate generated example. Playback, Escape, or a subtitle change closes the panel. No lookup request is made while the video is playing, and playback controls remain unobstructed.
 
 AI definitions are learning aids rather than authoritative dictionary entries. A definition or example translation in the wrong language gets one local retry and is omitted if still invalid. This cannot catch every semantic error, so review notes before adding them to Anki. Lookup text is sent only to the configured local OpenAI-compatible service.
 

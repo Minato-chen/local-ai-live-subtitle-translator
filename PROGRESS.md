@@ -133,3 +133,9 @@
 
 - New Anki cards no longer include an automatic show title, season/episode, or playback timestamp. The editor no longer shows a source field; users can organize cards with their chosen deck.
 - Existing Anki cards are unchanged.
+
+## Post-release update — Whole-word paused selection
+
+- Space-delimited Latin-script subtitles now render as visually unchanged clickable word blocks while paused; a click selects a whole word and a drag selects a continuous block range.
+- CJK subtitles retain native selection. Playback still hides the source line and disables lookup interaction.
+- Regression suite: 26/26 tests passing, including tokenization and phrase-range checks; JavaScript syntax and diff checks pass. Manual player interaction remains to be verified.

@@ -48,6 +48,8 @@ let lookupVersion = 0;
 let lastDictionaryEntry = null;
 let sessionDeck = "";
 let dictionaryAnchor = null;
+let wordBlockParts = null;
+let blockDrag = null;
 
 if (isTranslationPage()) init();
 
@@ -77,6 +79,8 @@ async function init() {
 
   window.addEventListener("resize", () => { positionOverlay(); positionDictionaryPanel(); }, { passive: true });
   document.addEventListener("mouseup", handleSelectionMouseUp);
+  sourceLine.addEventListener("mousedown", beginWordBlockDrag);
+  document.addEventListener("mousemove", updateWordBlockDrag);
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeInteractivePanels(); });
   document.addEventListener("visibilitychange", () => { if (document.hidden) exitPausedInteraction(); });
   setInterval(scanSubtitles, 500);
@@ -164,7 +168,7 @@ function scanSubtitles() {
   lastSource = text;
   translatedSource = "";
   const version = ++requestVersion;
-  sourceLine.textContent = text;
+  renderSourceLine(text);
   updatePausedUi();
   translatedLine.textContent = "...";
   statusLine.textContent = "";
@@ -398,11 +402,17 @@ function updatePausedUi() {
   const interactive = Boolean(settings.enabled && settings.dictionaryEnabled && videoPaused && lastSource);
   overlay.classList.toggle("nf-zh-paused", interactive);
   sourceLine.classList.toggle("nf-zh-hidden", !interactive);
-  if (!interactive) closeInteractivePanels();
+  if (!interactive) {
+    blockDrag = null;
+    sourceLine.querySelectorAll(".nf-zh-word-selected").forEach((node) => node.classList.remove("nf-zh-word-selected"));
+    closeInteractivePanels();
+  }
 }
 
 function exitPausedInteraction() {
   videoPaused = false;
+  blockDrag = null;
+  sourceLine?.querySelectorAll(".nf-zh-word-selected").forEach((node) => node.classList.remove("nf-zh-word-selected"));
   const selection = globalThis.getSelection?.();
   if (selectionInsideOverlay(selection)) selection.removeAllRanges();
   closeInteractivePanels();
@@ -420,13 +430,76 @@ function selectionInsideOverlay(selection) {
 }
 
 function handleSelectionMouseUp(event) {
-  if (!videoPaused || !settings.dictionaryEnabled || event.target.closest?.(".nf-zh-dictionary, .nf-zh-anki-editor")) return;
+  if (!videoPaused || !settings.dictionaryEnabled || event.target.closest?.(".nf-zh-dictionary, .nf-zh-anki-editor")) {
+    blockDrag = null;
+    return;
+  }
+  if (blockDrag) {
+    const drag = blockDrag;
+    blockDrag = null;
+    const token = event.target.closest?.(".nf-zh-word-block");
+    sourceLine.querySelectorAll(".nf-zh-word-selected").forEach((node) => node.classList.remove("nf-zh-word-selected"));
+    if ((!token && event.target !== sourceLine) || drag.source !== lastSource) return;
+    if (token && !sourceLine.contains(token)) return;
+    const end = token ? Number(token.dataset.blockIndex) : drag.end;
+    const term = SubtitleShared.wordBlockRange(wordBlockParts, drag.start, end);
+    if (term) requestDictionary(term, lastSource, blockRangeRect(drag.start, end));
+    return;
+  }
+  if (wordBlockParts) return;
   const selection = globalThis.getSelection?.();
   if (!selectionBelongsToSource(selection)) return;
   const term = SubtitleShared.normalizeSelection(selection.toString());
   if (!term) return;
   const rect = selection.getRangeAt(0).getBoundingClientRect();
   requestDictionary(term, lastSource, rect);
+}
+
+function renderSourceLine(text) {
+  blockDrag = null;
+  wordBlockParts = SubtitleShared.tokenizeWordBlocks(text);
+  sourceLine.classList.toggle("nf-zh-block-mode", Boolean(wordBlockParts));
+  if (!wordBlockParts) { sourceLine.textContent = text; return; }
+  const fragment = document.createDocumentFragment();
+  wordBlockParts.forEach((part, index) => {
+    if (!part.word) { fragment.append(document.createTextNode(part.text)); return; }
+    const span = document.createElement("span");
+    span.className = "nf-zh-word-block";
+    span.dataset.blockIndex = String(index);
+    span.textContent = part.text;
+    fragment.append(span);
+  });
+  sourceLine.replaceChildren(fragment);
+}
+
+function beginWordBlockDrag(event) {
+  if (!videoPaused || !settings.dictionaryEnabled || !wordBlockParts || event.button !== 0) return;
+  const token = event.target.closest?.(".nf-zh-word-block");
+  if (!token) return;
+  event.preventDefault();
+  const start = Number(token.dataset.blockIndex);
+  blockDrag = { start, end: start, source: lastSource };
+  token.classList.add("nf-zh-word-selected");
+}
+
+function updateWordBlockDrag(event) {
+  if (!blockDrag) return;
+  const token = event.target.closest?.(".nf-zh-word-block");
+  if (!token || !sourceLine.contains(token)) return;
+  blockDrag.end = Number(token.dataset.blockIndex);
+  const low = Math.min(blockDrag.start, blockDrag.end); const high = Math.max(blockDrag.start, blockDrag.end);
+  sourceLine.querySelectorAll(".nf-zh-word-block").forEach((node) => {
+    const index = Number(node.dataset.blockIndex);
+    node.classList.toggle("nf-zh-word-selected", index >= low && index <= high);
+  });
+}
+
+function blockRangeRect(start, end) {
+  const first = sourceLine.querySelector(`[data-block-index="${Math.min(start, end)}"]`);
+  const last = sourceLine.querySelector(`[data-block-index="${Math.max(start, end)}"]`);
+  if (!first || !last) return sourceLine.getBoundingClientRect();
+  const a = first.getBoundingClientRect(); const b = last.getBoundingClientRect();
+  return { left: Math.min(a.left, b.left), top: Math.min(a.top, b.top), right: Math.max(a.right, b.right), bottom: Math.max(a.bottom, b.bottom) };
 }
 
 function uiText(zh, en) { return settings.uiLanguage === "en" ? en : zh; }

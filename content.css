@@ -34,6 +34,11 @@
   outline: 1px solid rgba(255, 255, 255, 0.25);
 }
 
+#nf-zh-overlay.nf-zh-paused .nf-zh-source.nf-zh-block-mode { user-select: none; cursor: default; }
+#nf-zh-overlay.nf-zh-paused .nf-zh-word-block { cursor: pointer; border-radius: 2px; }
+#nf-zh-overlay.nf-zh-paused .nf-zh-word-block:hover,
+#nf-zh-overlay.nf-zh-paused .nf-zh-word-selected { background: rgba(255, 255, 255, 0.25); }
+
 #nf-zh-overlay .nf-zh-dictionary,
 #nf-zh-overlay .nf-zh-anki-editor {
   position: fixed;
