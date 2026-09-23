@@ -97,3 +97,9 @@
 - The supplied settings screenshot showed `Basic` with only `Front` and `Back`, while every optional value defaulted to `Back`. Because the note payload is keyed by field name, later values overwrote earlier values.
 - Optional mappings now default to empty (“不写入”) unless the user previously chose a real field; the defaults are merged without replacing explicit empty selections.
 - Settings validation and final note construction now reject duplicate field mappings, preventing silent overwrites.
+
+## Post-release fix — Consistent dictionary card layout
+
+- Removed the separate “语境释义” block from the card because it repeated the regular definition; the contextual value remains available to the Anki editor.
+- Video sentence and generated example translations now render immediately below the source sentence on one compact `译文：...` line.
+- Centralized the fixed dictionary prompt template and specified non-overlapping definitions, context-only meaning, source-language example, and translated example rules.

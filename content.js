@@ -466,7 +466,8 @@ function renderDictionary(entry) {
   dictionaryPanel.append(header);
   if (entry.pronunciation || entry.partOfSpeech) appendText(dictionaryPanel, [entry.pronunciation, entry.partOfSpeech].filter(Boolean).join(" · "), "nf-zh-meta");
   for (const definition of entry.definitions || []) appendText(dictionaryPanel, `• ${definition}`);
-  if (entry.contextualMeaning) appendLabeled(dictionaryPanel, uiText("语境释义", "In context"), entry.contextualMeaning);
+  // The definitions already explain the word. Keep contextualMeaning in the
+  // data for Anki, but avoid repeating a near-identical definition in the UI.
   appendBilingualExample(dictionaryPanel, uiText("视频原句", "Video sentence"), entry.videoSentence, entry.videoSentenceTranslation);
   appendBilingualExample(dictionaryPanel, uiText("新例句", "New example"), entry.generatedExample, entry.generatedExampleTranslation);
   dictionaryPanel.append(panelButton(
@@ -506,8 +507,10 @@ function appendBilingualExample(parent, label, original, translation) {
   const strong = document.createElement("b"); strong.textContent = label; wrap.append(strong);
   if (original) appendText(wrap, original, "nf-zh-example-original");
   if (translation && translation !== original) {
-    const translationLabel = document.createElement("span"); translationLabel.className = "nf-zh-example-label"; translationLabel.textContent = uiText("译文", "Translation");
-    wrap.append(translationLabel); appendText(wrap, translation, "nf-zh-example-translation");
+    const translated = document.createElement("p"); translated.className = "nf-zh-example-translation";
+    const label = document.createElement("span"); label.className = "nf-zh-example-label"; label.textContent = uiText("译文：", "Translation: ");
+    const text = document.createElement("span"); text.textContent = translation;
+    translated.append(label, text); wrap.append(translated);
   }
   parent.append(wrap);
 }

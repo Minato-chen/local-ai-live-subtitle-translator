@@ -57,3 +57,4 @@ These checks are blocked in the current environment because Netflix/browser inte
 - Video and generated examples are now explicit bilingual pairs; Hy-MT2 output with reversed/missing source examples is repaired before display, and all four values can be mapped to Anki fields.
 - Hy-MT2 reverse repair now uses the proven subtitle translation path with inferred language direction; mixed-script/Arabic-contaminated examples are suppressed.
 - Fixed Anki `Basic` mapping collisions: optional values default to “do not write”, and duplicate destination-field mappings are rejected instead of overwriting earlier fields.
+- Standardized dictionary card layout and prompt template: one definition area, compact translation rows, and explicit non-duplicating meanings/example instructions.
