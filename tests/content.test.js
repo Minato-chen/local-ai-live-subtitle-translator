@@ -60,3 +60,30 @@ test("playback translation does not fill the dictionary card's fragment translat
   assert.equal(vm.runInContext("translatedLine.textContent", context), "启动机器人，开始建立持久存在。");
   assert.equal(vm.runInContext("lastDictionaryEntry.videoSentenceTranslation", context), "");
 });
+
+test("zero context lines sends no prior subtitles", () => {
+  const context = {
+    location: { hostname: "www.youtube.com", pathname: "/watch" },
+    chrome: { storage: { sync: { get: () => new Promise(() => {}) } } }
+  };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../content.js"), "utf8"), context);
+  vm.runInContext('subtitleHistory.push("previous one", "previous two"); settings.contextLines = 0;', context);
+  assert.deepEqual(Array.from(context.recentTranslationContext()), []);
+  vm.runInContext("settings.contextLines = 1", context);
+  assert.deepEqual(Array.from(context.recentTranslationContext()), ["previous two"]);
+});
+
+test("closing lookup cancels its in-flight fragment translation", () => {
+  const sent = [];
+  const context = {
+    location: { hostname: "www.youtube.com", pathname: "/watch" },
+    chrome: { storage: { sync: { get: () => new Promise(() => {}) } }, runtime: { sendMessage: (message) => { sent.push(message); return Promise.resolve({ ok: true }); } } }
+  };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../content.js"), "utf8"), context);
+  vm.runInContext('activeFragmentRequestId = "fragment-test"; closeInteractivePanels();', context);
+  assert.equal(sent[0].type, "CANCEL_FRAGMENT_TRANSLATION");
+  assert.equal(sent[0].requestId, "fragment-test");
+  assert.equal(vm.runInContext("activeFragmentRequestId", context), null);
+});

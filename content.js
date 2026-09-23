@@ -26,6 +26,7 @@ const DEFAULTS = {
 const cache = new Map();
 const fragmentTranslationCache = new Map();
 const subtitleHistory = [];
+const requestNamespace = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 let settings = { ...DEFAULTS };
 let lastSource = "";
 let translatedSource = "";
@@ -35,6 +36,7 @@ let translationInFlight = false;
 let queuedTranslation = null;
 let activeRequestId = null;
 let nextRequestId = 0;
+let activeFragmentRequestId = null;
 let extensionContextInvalid = false;
 let overlay;
 let translatedLine;
@@ -163,6 +165,11 @@ function readSubtitle(container) {
   return text;
 }
 
+function recentTranslationContext() {
+  const count = Math.max(0, Math.min(8, Number(settings.contextLines) || 0));
+  return count ? subtitleHistory.slice(-count) : [];
+}
+
 function scanSubtitles() {
   if (extensionContextInvalid) return;
   if (!settings.enabled || !overlay) return;
@@ -197,7 +204,7 @@ function scanSubtitles() {
   updatePausedUi();
   translatedLine.textContent = "...";
   statusLine.textContent = "";
-  const context = subtitleHistory.slice(-Math.max(0, Number(settings.contextLines) || 0));
+  const context = recentTranslationContext();
   subtitleHistory.push(text);
   if (subtitleHistory.length > 20) subtitleHistory.shift();
 
@@ -222,7 +229,7 @@ async function requestTranslation(text, context, version) {
     return;
   }
   translationInFlight = true;
-  const requestId = `subtitle-${++nextRequestId}`;
+  const requestId = `subtitle-${requestNamespace}-${++nextRequestId}`;
   activeRequestId = requestId;
   try {
     await translateOne(text, context, version, requestId);
@@ -551,9 +558,10 @@ function startSelectedLookup(term, sentence, rect, kind) {
 
 async function requestDictionary(term, sentence, rect, kind = "word") {
   const version = ++lookupVersion;
+  cancelActiveFragmentTranslation();
   lastDictionaryEntry = null;
   if (lookupRequestId) chrome.runtime.sendMessage({ type: "CANCEL_LOOKUP", requestId: lookupRequestId }).catch(() => {});
-  lookupRequestId = `lookup-${Date.now()}-${version}`;
+  lookupRequestId = `lookup-${requestNamespace}-${version}`;
   showDictionaryShell(rect, term, uiText("正在查询…", "Looking up…"));
   try {
     const context = subtitleHistory.slice(0, -1).slice(-8);
@@ -577,12 +585,16 @@ async function requestDictionary(term, sentence, rect, kind = "word") {
 async function translateDictionaryFragment(entry, version) {
   const sentence = entry.videoSentence;
   const key = JSON.stringify([settings.serviceUrl, settings.source, settings.target, sentence]);
+  let requestId = null;
   try {
     let translation = fragmentTranslationCache.get(key);
     if (!translation) {
+      requestId = `fragment-${requestNamespace}-${++nextRequestId}`;
+      activeFragmentRequestId = requestId;
       const response = await chrome.runtime.sendMessage({
-        type: "TRANSLATE_FRAGMENT", text: sentence, source: settings.source, target: settings.target
+        type: "TRANSLATE_FRAGMENT", requestId, text: sentence, source: settings.source, target: settings.target
       });
+      if (version !== lookupVersion || !videoPaused || lastDictionaryEntry !== entry) return;
       if (!response?.ok) throw new Error(response?.error || "片段翻译失败");
       translation = response.translatedText;
       fragmentTranslationCache.set(key, translation);
@@ -602,7 +614,16 @@ async function translateDictionaryFragment(entry, version) {
       dictionaryPanel.append(note);
       positionDictionaryPanel();
     }
+  } finally {
+    if (activeFragmentRequestId === requestId) activeFragmentRequestId = null;
   }
+}
+
+function cancelActiveFragmentTranslation() {
+  if (!activeFragmentRequestId) return;
+  const requestId = activeFragmentRequestId;
+  activeFragmentRequestId = null;
+  chrome.runtime?.sendMessage?.({ type: "CANCEL_FRAGMENT_TRANSLATION", requestId }).catch(() => {});
 }
 
 function showDictionaryShell(rect, term, message) {
@@ -737,6 +758,7 @@ function renderEditorStatus(message, error = false) {
 
 function closeInteractivePanels() {
   lookupVersion++;
+  cancelActiveFragmentTranslation();
   if (lookupRequestId) chrome.runtime?.sendMessage?.({ type: "CANCEL_LOOKUP", requestId: lookupRequestId }).catch(() => {});
   lookupRequestId = null; lastDictionaryEntry = null;
   dictionaryAnchor = null;

@@ -10,6 +10,7 @@ const DEFAULTS = {
 
 const activeTranslations = new Map();
 const activeLookups = new Map();
+const activeFragments = new Map();
 const dictionaryCache = new Map();
 const DICTIONARY_CACHE_VERSION = "meaning-retry-v5";
 const modelCache = new Map();
@@ -39,7 +40,11 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
   chrome.tabs.get(tabId).then((tab) => updateTabIcon(tabId, tab.url)).catch(() => {});
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+function requestKey(requestId, sender) {
+  return `${sender?.tab?.id ?? "extension"}:${sender?.frameId ?? 0}:${sender?.documentId ?? ""}:${requestId}`;
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "OPEN_OPTIONS") {
     chrome.runtime.openOptionsPage()
       .then(() => sendResponse({ ok: true }))
@@ -49,41 +54,53 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message?.type === "TRANSLATE") {
     const controller = new AbortController();
-    if (message.requestId) activeTranslations.set(message.requestId, controller);
+    const key = requestKey(message.requestId, sender);
+    if (message.requestId) activeTranslations.set(key, controller);
     translate(message.text, message.context || [], controller.signal)
       .then((translatedText) => sendResponse({ ok: true, translatedText }))
       .catch((error) => sendResponse({ ok: false, error: error.message }))
       .finally(() => {
-        if (message.requestId) activeTranslations.delete(message.requestId);
+        if (message.requestId) activeTranslations.delete(key);
       });
     return true;
   }
 
   if (message?.type === "TRANSLATE_FRAGMENT") {
-    translateFragment(message.text, message.source, message.target)
+    const controller = new AbortController();
+    const key = requestKey(message.requestId, sender);
+    if (message.requestId) activeFragments.set(key, controller);
+    translateFragment(message.text, message.source, message.target, controller.signal)
       .then((translatedText) => sendResponse({ ok: true, translatedText }))
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
+      .catch((error) => sendResponse({ ok: false, error: error.message }))
+      .finally(() => { if (message.requestId) activeFragments.delete(key); });
     return true;
   }
 
   if (message?.type === "CANCEL_TRANSLATION") {
-    activeTranslations.get(message.requestId)?.abort();
+    activeTranslations.get(requestKey(message.requestId, sender))?.abort();
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (message?.type === "CANCEL_FRAGMENT_TRANSLATION") {
+    activeFragments.get(requestKey(message.requestId, sender))?.abort();
     sendResponse({ ok: true });
     return false;
   }
 
   if (message?.type === "LOOKUP_WORD") {
     const controller = new AbortController();
-    if (message.requestId) activeLookups.set(message.requestId, controller);
+    const key = requestKey(message.requestId, sender);
+    if (message.requestId) activeLookups.set(key, controller);
     lookupWord(message, controller.signal)
       .then((entry) => sendResponse({ ok: true, entry }))
       .catch((error) => sendResponse({ ok: false, error: error.message }))
-      .finally(() => { if (message.requestId) activeLookups.delete(message.requestId); });
+      .finally(() => { if (message.requestId) activeLookups.delete(key); });
     return true;
   }
 
   if (message?.type === "CANCEL_LOOKUP") {
-    activeLookups.get(message.requestId)?.abort();
+    activeLookups.get(requestKey(message.requestId, sender))?.abort();
     sendResponse({ ok: true });
     return false;
   }
@@ -117,14 +134,14 @@ async function translate(text, context, signal) {
   return translateWithLlamaCpp(text, context, settings, signal);
 }
 
-async function translateFragment(text, source, target) {
+async function translateFragment(text, source, target, signal) {
   const settings = await chrome.storage.sync.get(DEFAULTS);
   const sourceLanguage = source || settings.source;
   const targetLanguage = target || settings.target;
   const names = { en: "英语", zh: "简体中文", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语" };
   const sourceHint = sourceLanguage === "auto" ? "" : `输入片段是${names[sourceLanguage] || sourceLanguage}。`;
   const targetName = names[targetLanguage] || targetLanguage;
-  const model = await discoverModel(settings.serviceUrl, undefined, settings.timeoutMs);
+  const model = await discoverModel(settings.serviceUrl, signal, settings.timeoutMs);
   const endpoint = serviceEndpoint(settings.serviceUrl, "/v1/chat/completions");
   const request = (minimal = false) => fetchWithTimeout(endpoint, settings.timeoutMs, {
     model, stream: false, temperature: 0, max_tokens: 96,
@@ -134,7 +151,7 @@ async function translateFragment(text, source, target) {
         : `你是字幕片段翻译器。${sourceHint}仅翻译用户给出的片段为${targetName}，不参考前文或后文，不添加缺失的主语、动作或情节。不完整的片段可以译为不完整的短语。只输出译文。` },
       { role: "user", content: String(text || "").trim() }
     ]
-  }, cleanOpenAiResponse);
+  }, cleanOpenAiResponse, signal);
   try { return await request(); }
   catch (error) {
     if (error.code !== "PROMPT_ECHO") throw error;

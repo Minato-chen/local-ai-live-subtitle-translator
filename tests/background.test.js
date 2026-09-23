@@ -7,11 +7,12 @@ const shared = require("../lib/shared.js");
 const dictionary = require("../lib/dictionary.js");
 
 function backgroundContext(fetch) {
+  let messageListener;
   const addListener = () => {};
   const context = {
     importScripts: () => {},
     SubtitleShared: shared,
-    chrome: { tabs: { onUpdated: { addListener }, onActivated: { addListener } }, runtime: { onMessage: { addListener } } },
+    chrome: { tabs: { onUpdated: { addListener }, onActivated: { addListener } }, runtime: { onMessage: { addListener: (listener) => { messageListener = listener; } } } },
     fetch,
     AbortController,
     AbortSignal,
@@ -22,8 +23,35 @@ function backgroundContext(fetch) {
   };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../background.js"), "utf8"), context);
+  context.dispatchMessage = (message, sender) => messageListener(message, sender, () => {});
   return context;
 }
+
+test("cancellation cannot cross tab boundaries even with identical request IDs", () => {
+  const context = backgroundContext(() => { throw new Error("should not fetch"); });
+  context.translate = (_text, _context, signal) => new Promise((_resolve, reject) => {
+    signal.addEventListener("abort", () => reject(new Error("cancelled")), { once: true });
+  });
+  const first = { tab: { id: 101 }, frameId: 0 };
+  const second = { tab: { id: 102 }, frameId: 0 };
+  context.dispatchMessage({ type: "TRANSLATE", requestId: "same-id", text: "one" }, first);
+  context.dispatchMessage({ type: "TRANSLATE", requestId: "same-id", text: "two" }, second);
+  context.dispatchMessage({ type: "CANCEL_TRANSLATION", requestId: "same-id" }, first);
+  assert.equal(vm.runInContext('activeTranslations.get("101:0::same-id").signal.aborted', context), true);
+  assert.equal(vm.runInContext('activeTranslations.get("102:0::same-id").signal.aborted', context), false);
+  context.dispatchMessage({ type: "CANCEL_TRANSLATION", requestId: "same-id" }, second);
+});
+
+test("fragment translation can be cancelled after leaving paused lookup", () => {
+  const context = backgroundContext(() => { throw new Error("should not fetch"); });
+  context.translateFragment = (_text, _source, _target, signal) => new Promise((_resolve, reject) => {
+    signal.addEventListener("abort", () => reject(new Error("cancelled")), { once: true });
+  });
+  const sender = { tab: { id: 101 }, frameId: 0 };
+  context.dispatchMessage({ type: "TRANSLATE_FRAGMENT", requestId: "fragment-1", text: "part" }, sender);
+  context.dispatchMessage({ type: "CANCEL_FRAGMENT_TRANSLATION", requestId: "fragment-1" }, sender);
+  assert.equal(vm.runInContext('activeFragments.get("101:0::fragment-1").signal.aborted', context), true);
+});
 
 test("AI endpoints accept only local HTTP addresses", () => {
   const context = backgroundContext(() => { throw new Error("should not fetch"); });

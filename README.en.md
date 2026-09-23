@@ -56,7 +56,7 @@ AI meanings are learning aids rather than authoritative dictionary entries. The 
 
 In auto mode, a kanji-only subtitle lookup checks recent original subtitle lines for kana evidence before treating it as Chinese. If the whole passage lacks kana, the script alone cannot reliably distinguish Japanese from Chinese; explicitly select the source language in settings.
 
-Lookup uses one short plain-text meaning request, with no JSON requirement. If the subtitle translation is still pending, it is added to the lookup card or an empty Anki editor field when ready.
+Lookup first requests a short plain-text meaning, with one retry if the model returns an unusable result. The video-sentence translation is generated separately from only the displayed subtitle fragment; it does not reuse the context-aware translation shown during playback. When ready, it fills the lookup card or an empty Anki editor field. Closing lookup or resuming playback cancels an unfinished fragment translation.
 
 ## Anki Integration
 

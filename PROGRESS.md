@@ -267,6 +267,13 @@
 - Dictionary cards now request a separate translation of only the displayed current subtitle fragment. They show the meaning immediately, then fill the fragment translation and any open Anki editor when ready. Failed fragment translation leaves the card usable and the Anki translation editable.
 - The fragment translation cache is separate from the playback cache and is cleared when settings or video page changes. Automated tests: 37/37 passing; syntax and diff checks pass. Live model/browser behavior remains to be verified.
 
+## Dev-branch review fixes
+
+- Setting prior-context lines to zero now sends no prior subtitles instead of accidentally sending the whole history.
+- Translation, lookup, and fragment request IDs are unique per content-script instance; background cancellation is additionally scoped to the sending tab, frame, and document so one video tab cannot cancel another.
+- Closing lookup or resuming playback aborts the in-flight fragment translation in the background and local fetch, leaving playback translation free to proceed.
+- Corrected both READMEs to describe the separate fragment translation. Automated tests: 41/41 passing; syntax and diff checks pass. Live browser/model testing remains pending.
+
 ## Prevent false word-form notes
 
 - Word-form notes are now tied to the actual selected text, require a genuinely different base form, and reject punctuation/separator patterns that indicate the model placed a translation or multiple meanings after the arrow.
