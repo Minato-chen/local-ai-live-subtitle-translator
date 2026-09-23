@@ -122,3 +122,9 @@
 - Definitions in the wrong language and generated-example translations in the wrong language receive one targeted local translation attempt. Bad retries are omitted instead of presented as valid results; normal fields incur no extra request.
 - Obviously malformed pronunciation is hidden. Language checks cannot prove semantic correctness, so fluent but wrong translations still need review before Anki submission.
 - Verification: 25/25 automated tests, JavaScript syntax checks, and whitespace checks passed. Live model output still needs user-profile testing.
+
+## Post-release fix — Sentence-shaped definitions and duplicated examples
+
+- Definitions that look like full subtitle translations are rejected; the selected term alone gets one translation attempt to obtain a short gloss.
+- A generated example identical to the video sentence (ignoring punctuation and case) gets one isolated regeneration attempt. If it still fails validation, the duplicate is omitted.
+- Regression suite: 26/26 tests passing; JavaScript syntax and diff checks pass. Live Hy-MT2 behavior still needs a playback check.

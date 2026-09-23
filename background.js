@@ -177,15 +177,31 @@ async function repairDictionaryQuality(entry, { term, sentence, source, target, 
   const sourceLanguage = DictionaryLib.inferSourceLanguage(source, sentence);
   if (!DictionaryLib.isPlausiblePronunciation(entry.pronunciation)) entry.pronunciation = "";
   if (DictionaryLib.needsDefinitionRepair(entry, targetLanguage)) {
-    const gloss = (entry.definitions || []).join("；") || entry.contextualMeaning || term;
     try {
-      const translated = await translateWithLlamaCpp(gloss, [], {
+      const translated = await translateWithLlamaCpp(term, [], {
         ...settings, source: sourceLanguage, target: targetLanguage
       }, signal);
-      entry.definitions = DictionaryLib.isTargetLanguage(translated, targetLanguage) ? [translated] : [];
+      entry.definitions = DictionaryLib.isConciseDefinition(translated, targetLanguage) ? [translated] : [];
     } catch (error) { if (signal.aborted) throw error; entry.definitions = []; }
   } else {
-    entry.definitions = entry.definitions.filter((value) => DictionaryLib.isTargetLanguage(value, targetLanguage));
+    entry.definitions = entry.definitions.filter((value) => DictionaryLib.isConciseDefinition(value, targetLanguage));
+  }
+  if (DictionaryLib.sameExample(entry.generatedExample, sentence)) {
+    entry.generatedExample = "";
+    entry.generatedExampleTranslation = "";
+    try {
+      const model = await discoverModel(settings.serviceUrl);
+      const candidate = await fetchWithTimeout(serviceEndpoint(settings.serviceUrl, "/v1/chat/completions"), settings.timeoutMs, {
+        model, stream: false, temperature: 0.3, max_tokens: 64,
+        messages: [
+          { role: "system", content: `Write one short, new ${sourceLanguage} example sentence using the user's word. Output only the sentence.` },
+          { role: "user", content: term }
+        ]
+      }, cleanOpenAiResponse, signal);
+      if (candidate.toLocaleLowerCase().includes(term.toLocaleLowerCase()) &&
+          DictionaryLib.isLanguagePlausible(candidate, sourceLanguage) &&
+          !DictionaryLib.sameExample(candidate, sentence)) entry.generatedExample = candidate;
+    } catch (error) { if (signal.aborted) throw error; }
   }
   if (entry.generatedExample && !DictionaryLib.isTargetLanguage(entry.generatedExampleTranslation, targetLanguage)) {
     try {
