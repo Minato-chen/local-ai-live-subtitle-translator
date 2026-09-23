@@ -65,6 +65,8 @@ AI definitions are learning aids rather than authoritative dictionary entries. A
 
 The front contains only the word. The back combines part of speech and meanings on one line, followed by the video sentence and its translation. No new example, source, or timestamp is added. You can choose or manually create a deck for each show; the extension never creates a deck merely because a movie is opened. Note contents are not stored in browser sync and are sent to local AnkiConnect only after confirmation.
 
+Anki decks can contain mixed note types, so no deck is disabled based on its existing cards. New notes from this extension always use Basic; other note types are disabled in settings.
+
 ## Privacy and Disclaimer
 
 - This is an independent project. It is not affiliated with, endorsed by, or authorized by Netflix, YouTube, Google, or Microsoft.

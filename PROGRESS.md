@@ -180,3 +180,8 @@
 
 - Japanese lookup now displays only noun, verb, or adjective labels in both the dictionary and Anki editor when the model's category maps clearly; other labels are omitted. Detailed conjugation remains separate in the optional word-form note.
 - English and Chinese display behavior is unchanged. Automated tests: 34/34 passing; syntax and diff checks pass. Live model output still needs manual review.
+
+## Anki deck/type clarification
+
+- Clarified in settings that any deck may be selected even if it contains non-Basic notes. The extension creates only Basic notes; unsupported note types remain disabled and labeled in their own selector.
+- No deck data or existing notes are changed.
