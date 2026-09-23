@@ -204,3 +204,9 @@
 - Removed the second full-sentence translation from the blocking lookup path. The already-running subtitle translation fills the dictionary or empty Anki editor translation field asynchronously when available.
 - Accept concise valid plain-text meanings and JSON with harmless trailing commas; only unusable formatting triggers one short meaning-only request. Invalid content is still rejected.
 - Regression tests: 42/42 passing; JavaScript syntax and diff checks pass. Live latency and model behavior could not be measured because the local service was not running at 127.0.0.1:8080.
+
+## Single-format contextual lookup
+
+- Replaced the dictionary-shaped JSON request with one short plain-text meaning request for both words and phrases. Removed AI type classification, part of speech, base form, pronunciation, and grammar repair from new results.
+- Lookup and Anki now use only selected text, contextual meaning (including a short explanation when needed), video sentence, and its translation. Existing Anki notes remain untouched.
+- Retained native-script source inference and selection length/boundary checks. Tests and syntax checks pass; live model evaluation remains manual.

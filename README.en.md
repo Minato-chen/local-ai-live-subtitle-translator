@@ -50,15 +50,13 @@ The settings page has three sections:
 
 ## Lookup While Paused
 
-For Japanese, only clearly identified nouns, verbs, and adjectives receive a basic part-of-speech label; particles, auxiliaries, and uncertain labels are hidden. English and Chinese labels are unchanged.
+Enable paused lookup, then pause a video to reveal the current original subtitle retained by the extension. Click whole-word blocks or drag across them for space-delimited subtitles; Japanese, Chinese, and similar subtitles use native text selection. Lookup starts immediately without a word/phrase type choice. Every result shows a short contextual meaning (with a brief usage note when needed), the video sentence, and its translation. It does not generate a new example or show part of speech, base form, or grammar analysis. Cross-sentence and overly long selections are rejected. Playback, Escape, or a subtitle change closes the panel. No lookup request is made while the video is playing.
 
-Enable paused lookup, then pause a video to reveal the current original subtitle retained by the extension. For space-delimited subtitles such as English, clicking one whole-word block immediately looks up a word; dragging across blocks immediately looks up a phrase. Japanese, Chinese, and similar subtitles use native text selection, with the word/phrase type inferred in the same AI response—no separate type choice. Cross-sentence and overly long selections are rejected. Sentence parsing and sentence cards are out of scope. Word results show a meaning and video sentence, with a base form and form note only when basic checks pass. Phrase results show an overall meaning, an optional short usage note, and the video sentence. English, Chinese, and Japanese have separate dictionary rules. Kanji-only Japanese cannot reliably be distinguished from Chinese by script alone, so explicitly select Japanese as the source language for Japanese subtitles. Other languages still use generic rules. Review model-generated word-form information before making a card. Playback, Escape, or a subtitle change closes the panel. No lookup request is made while the video is playing, and playback controls remain unobstructed.
-
-AI definitions are learning aids rather than authoritative dictionary entries. A definition in the wrong language gets one local retry and is omitted if still invalid. This cannot catch every semantic error, so review notes before adding them to Anki. Lookup text is sent only to the configured local OpenAI-compatible service.
+AI meanings are learning aids rather than authoritative dictionary entries. The extension checks only for short target-language text, not semantic accuracy; review notes before adding them to Anki. Lookup text is sent only to the configured local OpenAI-compatible service.
 
 In auto mode, a kanji-only subtitle lookup checks recent original subtitle lines for kana evidence before treating it as Chinese. If the whole passage lacks kana, the script alone cannot reliably distinguish Japanese from Chinese; explicitly select the source language in settings.
 
-Lookup returns the meaning without waiting for a second full-sentence translation. If the subtitle translation is still pending, it is added to the dictionary card or an empty Anki editor field when ready. A concise valid non-JSON model reply can be accepted; only unusable output triggers a short meaning-only retry.
+Lookup uses one short plain-text meaning request, with no JSON requirement. If the subtitle translation is still pending, it is added to the lookup card or an empty Anki editor field when ready.
 
 ## Anki Integration
 
@@ -67,7 +65,7 @@ Lookup returns the meaning without waiting for a second full-sentence translatio
 3. Choose any default deck. Currently only the `Basic` note type is supported; other note types are disabled and labeled in the list. The front is fixed to `Front` and the back to `Back`. A modified Basic template must still display those fields on the corresponding sides.
 4. After lookup, click **Add to Anki**, review or edit the content, deck, and tags, then confirm. You can explicitly create a subdeck such as `Subtitle Learning::Movie title` from this editor.
 
-The front contains only the word. The back combines part of speech and meanings on one line, followed by the video sentence and its translation. No new example, source, or timestamp is added. You can choose or manually create a deck for each show; the extension never creates a deck merely because a movie is opened. Note contents are not stored in browser sync and are sent to local AnkiConnect only after confirmation.
+The front contains only the selected text. The back combines its meaning, video sentence, and translation. No new example, source, or timestamp is added. You can choose or manually create a deck for each show; the extension never creates a deck merely because a movie is opened. Note contents are not stored in browser sync and are sent to local AnkiConnect only after confirmation.
 
 Anki decks can contain mixed note types, so no deck is disabled based on its existing cards. New notes from this extension always use Basic; other note types are disabled in settings.
 

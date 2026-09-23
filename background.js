@@ -113,93 +113,27 @@ async function lookupWord(message, signal) {
   const settings = await chrome.storage.sync.get(DEFAULTS);
   const term = SubtitleShared.normalizeSelection(message.term);
   if (!term) throw new Error("请选择不超过 80 个字符的单词或短语");
-  const kind = ["word", "phrase"].includes(message.kind) ? message.kind : "auto";
-  const selectionIssue = SubtitleShared.selectionIssue(term, kind);
+  const selectionIssue = SubtitleShared.selectionIssue(term, "auto");
   if (selectionIssue) throw new Error(selectionIssue);
   const sentence = String(message.sentence || "").trim().slice(0, 500);
   const sourceLanguage = DictionaryLib.inferSourceLanguage(message.source, sentence, message.context);
-  const cacheKey = JSON.stringify([settings.serviceUrl, sourceLanguage, message.target, kind, term, sentence]);
+  const targetLanguage = message.target || settings.target || "zh";
+  const cacheKey = JSON.stringify([settings.serviceUrl, sourceLanguage, targetLanguage, term, sentence]);
   let videoSentenceTranslation = String(message.videoSentenceTranslation || "").trim().slice(0, 500);
   if (videoSentenceTranslation && !DictionaryLib.isTargetLanguage(videoSentenceTranslation, message.target || settings.target || "zh")) videoSentenceTranslation = "";
   if (dictionaryCache.has(cacheKey)) {
     return { ...dictionaryCache.get(cacheKey), videoSentenceTranslation };
   }
   const model = await discoverModel(settings.serviceUrl);
-  const messages = DictionaryLib.buildDictionaryMessages({ term, sentence, source: sourceLanguage, target: message.target, kind });
+  const messages = DictionaryLib.buildMeaningMessages({ term, sentence, source: sourceLanguage, target: targetLanguage });
   const endpoint = serviceEndpoint(settings.serviceUrl, "/v1/chat/completions");
-  const basePayload = { model, stream: false, temperature: 0.1, max_tokens: 320, messages };
-  const targetLanguage = message.target || settings.target || "zh";
-  const parseEntry = (data) => DictionaryLib.parseDictionaryResponse(data, targetLanguage, term);
-  const meaningOnly = async () => {
-    const meaning = await fetchWithTimeout(endpoint, settings.timeoutMs, {
-      model, stream: false, temperature: 0, max_tokens: 64,
-      messages: DictionaryLib.buildContextMeaningMessages({ term, sentence, source: sourceLanguage, target: targetLanguage })
-    }, cleanOpenAiResponse, signal);
-    try { return DictionaryLib.entryFromMeaning(meaning, term, targetLanguage); }
-    catch { throw new Error("本地模型没有返回可用的简短释义，请重试"); }
-  };
-  let entry;
-  try {
-    entry = await fetchWithTimeout(endpoint, settings.timeoutMs, {
-      ...basePayload,
-      response_format: DictionaryLib.dictionaryResponseFormat()
-    }, parseEntry, signal);
-  } catch (error) {
-    if (/HTTP 400|response.format|json.schema|unsupported|unknown (field|parameter)/i.test(error.message)) {
-      try { entry = await fetchWithTimeout(endpoint, settings.timeoutMs, basePayload, parseEntry, signal); }
-      catch (retryError) {
-        if (!/词典返回格式无效|词典服务没有返回内容/.test(retryError.message)) throw retryError;
-        entry = await meaningOnly();
-      }
-    } else if (/词典返回格式无效|词典服务没有返回内容/.test(error.message)) {
-      // The translation-focused local model sometimes ignores JSON mode.
-      // Retry only the meaning, rather than repeating the full dictionary prompt.
-      entry = await meaningOnly();
-    } else throw error;
-  }
-  const resolvedKind = DictionaryLib.resolveLookupKind(kind, entry.kind, term);
-  const resolvedIssue = SubtitleShared.selectionIssue(term, resolvedKind);
-  if (resolvedIssue) throw new Error(resolvedIssue);
-  await repairDictionaryQuality(entry, { term, sentence, source: sourceLanguage, target: message.target, kind: resolvedKind, settings, signal });
-  // The model may return a lemma such as "keep" for a selected form "kept".
-  entry = DictionaryLib.preserveSelectedTerm(entry, term);
-  entry.kind = resolvedKind;
+  const meaning = await fetchWithTimeout(endpoint, settings.timeoutMs, {
+    model, stream: false, temperature: 0, max_tokens: 128, messages
+  }, (data) => DictionaryLib.parseMeaningResponse(data, targetLanguage), signal);
+  const entry = { term, meaning };
   dictionaryCache.set(cacheKey, entry);
   if (dictionaryCache.size > 200) dictionaryCache.delete(dictionaryCache.keys().next().value);
   return { ...entry, videoSentenceTranslation };
-}
-
-async function repairDictionaryQuality(entry, { term, sentence, source, target, kind, settings, signal }) {
-  const targetLanguage = target || settings.target || "zh";
-  const sourceLanguage = DictionaryLib.inferSourceLanguage(source, sentence);
-  Object.assign(entry, DictionaryLib.sanitizeWordForm(entry, term, sourceLanguage));
-  if (!DictionaryLib.isPlausiblePronunciation(entry.pronunciation, sourceLanguage)) entry.pronunciation = "";
-  if (kind === "phrase") {
-    entry.pronunciation = ""; entry.partOfSpeech = ""; entry.formNote = ""; entry.normalizedTerm = term; entry.lemma = "";
-  } else if (kind === "unknown") {
-    entry.partOfSpeech = ""; entry.formNote = ""; entry.normalizedTerm = term; entry.lemma = "";
-  } else if (!entry.normalizedTerm || entry.normalizedTerm.toLocaleLowerCase() === term.toLocaleLowerCase() ||
-             !DictionaryLib.isTargetLanguage(entry.formNote, targetLanguage) || entry.formNote.length > 80) {
-    entry.formNote = "";
-  }
-  if (kind === "word") entry.lemma = DictionaryLib.trustedLemma(entry, term, sourceLanguage, targetLanguage);
-  if (DictionaryLib.needsDefinitionRepair(entry, targetLanguage)) {
-    if (DictionaryLib.isConciseDefinition(entry.contextualMeaning, targetLanguage)) {
-      entry.definitions = [entry.contextualMeaning];
-    } else {
-      try {
-        const model = await discoverModel(settings.serviceUrl);
-        const meaning = await fetchWithTimeout(serviceEndpoint(settings.serviceUrl, "/v1/chat/completions"), settings.timeoutMs, {
-          model, stream: false, temperature: 0, max_tokens: 80,
-          messages: DictionaryLib.buildContextMeaningMessages({ term, sentence, source: sourceLanguage, target: targetLanguage })
-        }, cleanOpenAiResponse, signal);
-        entry.definitions = DictionaryLib.isConciseDefinition(meaning, targetLanguage) ? [meaning] : [];
-      } catch (error) { if (signal.aborted) throw error; entry.definitions = []; }
-    }
-  } else {
-    entry.definitions = entry.definitions.filter((value) => DictionaryLib.isConciseDefinition(value, targetLanguage));
-  }
-  if (kind === "phrase") entry.usageNote = DictionaryLib.phraseUsage(entry, targetLanguage);
 }
 
 const ANKI_ACTIONS = new Set(["requestPermission", "version", "deckNames", "createDeck", "modelNames", "modelFieldNames", "modelFieldsOnTemplates", "canAddNotes", "addNote"]);
