@@ -185,3 +185,10 @@
 
 - Clarified in settings that any deck may be selected even if it contains non-Basic notes. The extension creates only Basic notes; unsupported note types remain disabled and labeled in their own selector.
 - No deck data or existing notes are changed.
+
+## Automatic word/phrase lookup
+
+- Removed the word/phrase choice buttons. Space-delimited single-word clicks and multi-word drags query immediately; native selections also query immediately with classification in the same dictionary response.
+- Added a bounded `kind` field to the dictionary schema. Invalid or missing classifications fall back to neutral meaning display without part of speech or form claims; clearly spaced multiword selections are always phrases.
+- Validated distinct base forms can appear in the dictionary and as editable Anki back content. Phrase results may include a short nonduplicate usage note. Both continue to use only the video sentence and its translation.
+- Automated tests: 40/40 passing; syntax and diff checks pass. Manual browser and local-model testing remain to be done.

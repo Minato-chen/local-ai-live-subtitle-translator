@@ -113,7 +113,7 @@ async function lookupWord(message, signal) {
   const settings = await chrome.storage.sync.get(DEFAULTS);
   const term = SubtitleShared.normalizeSelection(message.term);
   if (!term) throw new Error("请选择不超过 80 个字符的单词或短语");
-  const kind = message.kind === "phrase" ? "phrase" : "word";
+  const kind = ["word", "phrase"].includes(message.kind) ? message.kind : "auto";
   const selectionIssue = SubtitleShared.selectionIssue(term, kind);
   if (selectionIssue) throw new Error(selectionIssue);
   const sentence = String(message.sentence || "").trim().slice(0, 500);
@@ -141,10 +141,13 @@ async function lookupWord(message, signal) {
     if (!/HTTP 400|response.format|json.schema|unsupported|unknown (field|parameter)/i.test(error.message)) throw error;
     entry = await fetchWithTimeout(endpoint, settings.timeoutMs, basePayload, DictionaryLib.parseDictionaryResponse, signal);
   }
-  await repairDictionaryQuality(entry, { term, sentence, source: message.source, target: message.target, kind, settings, signal });
+  const resolvedKind = DictionaryLib.resolveLookupKind(kind, entry.kind, term);
+  const resolvedIssue = SubtitleShared.selectionIssue(term, resolvedKind);
+  if (resolvedIssue) throw new Error(resolvedIssue);
+  await repairDictionaryQuality(entry, { term, sentence, source: message.source, target: message.target, kind: resolvedKind, settings, signal });
   // The model may return a lemma such as "keep" for a selected form "kept".
   entry = DictionaryLib.preserveSelectedTerm(entry, term);
-  entry.kind = kind;
+  entry.kind = resolvedKind;
   dictionaryCache.set(cacheKey, entry);
   if (dictionaryCache.size > 200) dictionaryCache.delete(dictionaryCache.keys().next().value);
   if (!videoSentenceTranslation && sentence) videoSentenceTranslation = await translateWithLlamaCpp(sentence, [], settings, signal);
@@ -157,11 +160,14 @@ async function repairDictionaryQuality(entry, { term, sentence, source, target, 
   Object.assign(entry, DictionaryLib.sanitizeWordForm(entry, term, sourceLanguage));
   if (!DictionaryLib.isPlausiblePronunciation(entry.pronunciation, sourceLanguage)) entry.pronunciation = "";
   if (kind === "phrase") {
-    entry.pronunciation = ""; entry.partOfSpeech = ""; entry.formNote = ""; entry.normalizedTerm = term;
+    entry.pronunciation = ""; entry.partOfSpeech = ""; entry.formNote = ""; entry.normalizedTerm = term; entry.lemma = "";
+  } else if (kind === "unknown") {
+    entry.partOfSpeech = ""; entry.formNote = ""; entry.normalizedTerm = term; entry.lemma = "";
   } else if (!entry.normalizedTerm || entry.normalizedTerm.toLocaleLowerCase() === term.toLocaleLowerCase() ||
              !DictionaryLib.isTargetLanguage(entry.formNote, targetLanguage) || entry.formNote.length > 80) {
     entry.formNote = "";
   }
+  if (kind === "word") entry.lemma = DictionaryLib.trustedLemma(entry, term, sourceLanguage, targetLanguage);
   if (DictionaryLib.needsDefinitionRepair(entry, targetLanguage)) {
     if (DictionaryLib.isConciseDefinition(entry.contextualMeaning, targetLanguage)) {
       entry.definitions = [entry.contextualMeaning];
@@ -178,6 +184,7 @@ async function repairDictionaryQuality(entry, { term, sentence, source, target, 
   } else {
     entry.definitions = entry.definitions.filter((value) => DictionaryLib.isConciseDefinition(value, targetLanguage));
   }
+  if (kind === "phrase") entry.usageNote = DictionaryLib.phraseUsage(entry, targetLanguage);
 }
 
 const ANKI_ACTIONS = new Set(["requestPermission", "version", "deckNames", "createDeck", "modelNames", "modelFieldNames", "modelFieldsOnTemplates", "canAddNotes", "addNote"]);

@@ -27,6 +27,7 @@ test("schema does not request generated examples", () => {
   assert.equal(format.type, "json_object");
   assert.equal(format.schema.additionalProperties, false);
   assert.equal(Object.hasOwn(format.schema.properties, "generatedExample"), false);
+  assert.deepEqual(format.schema.properties.kind.enum, ["word", "phrase"]);
 });
 test("detects source language and rejects mixed-script corruption", () => {
   assert.equal(d.inferSourceLanguage("auto", "Was that my question?"), "en");
@@ -56,7 +57,26 @@ test("dictionary prompt distinguishes word forms from phrases", () => {
   const word = d.buildDictionaryMessages({ term: "kept", sentence: "He kept me here.", target: "zh" });
   const phrase = d.buildDictionaryMessages({ term: "keep up with", sentence: "Keep up with us.", target: "zh", kind: "phrase" });
   assert.match(word[0].content, /词形关系/);
+  assert.match(word[1].content, /请判断单词或短语/);
   assert.match(phrase[1].content, /查询类型：短语/);
+});
+test("resolves lookup type without extra interaction", () => {
+  assert.equal(d.resolveLookupKind("word", "phrase", "kept"), "word");
+  assert.equal(d.resolveLookupKind("phrase", "word", "keep up"), "phrase");
+  assert.equal(d.resolveLookupKind("auto", "phrase", "気にする"), "phrase");
+  assert.equal(d.resolveLookupKind("auto", "word", "食べました"), "word");
+  assert.equal(d.resolveLookupKind("auto", "word", "keep up"), "phrase");
+  assert.equal(d.resolveLookupKind("auto", "", "気にする"), "unknown");
+  assert.equal(d.resolveLookupKind("auto", "word", "这是一个超过二十四个字但仍在短语长度限制内的中文选区内容"), "phrase");
+});
+test("shows only a nonduplicate short phrase usage note", () => {
+  assert.equal(d.phraseUsage({ definitions: ["放弃"], contextualMeaning: "表示停止继续尝试" }, "zh"), "表示停止继续尝试");
+  assert.equal(d.phraseUsage({ definitions: ["放弃"], contextualMeaning: "放弃" }, "zh"), "");
+});
+test("shows a base form only with a plausible form explanation", () => {
+  assert.equal(d.trustedLemma({ normalizedTerm: "食べる", formNote: "丁寧过去形" }, "食べました", "ja", "zh"), "食べる");
+  assert.equal(d.trustedLemma({ normalizedTerm: "お父さんです", formNote: "" }, "お父さん", "ja", "zh"), "");
+  assert.equal(d.trustedLemma({ normalizedTerm: "keep the secret", formNote: "过去式" }, "kept", "en", "zh"), "");
 });
 test("uses independent Japanese dictionary and context guidance", () => {
   const messages = d.buildDictionaryMessages({ term: "食べました", sentence: "昨日食べました。", source: "ja", target: "zh" });

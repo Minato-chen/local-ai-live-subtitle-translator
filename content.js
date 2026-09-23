@@ -446,7 +446,7 @@ function handleSelectionMouseUp(event) {
     if (term) {
       const rect = blockRangeRect(drag.start, end);
       if (drag.start === end) startSelectedLookup(term, lastSource, rect, "word");
-      else showSelectionConfirmation(term, lastSource, rect, ["phrase"]);
+      else startSelectedLookup(term, lastSource, rect, "phrase");
     }
     return;
   }
@@ -456,7 +456,7 @@ function handleSelectionMouseUp(event) {
   const term = SubtitleShared.normalizeSelection(selection.toString());
   if (!term) return;
   const rect = selection.getRangeAt(0).getBoundingClientRect();
-  showSelectionConfirmation(term, lastSource, rect, ["word", "phrase"]);
+  startSelectedLookup(term, lastSource, rect, "auto");
 }
 
 function renderSourceLine(text) {
@@ -514,18 +514,6 @@ function startSelectedLookup(term, sentence, rect, kind) {
   requestDictionary(term, sentence, rect, kind);
 }
 
-function showSelectionConfirmation(term, sentence, rect, kinds) {
-  const available = kinds.filter((kind) => !SubtitleShared.selectionIssue(term, kind));
-  if (!available.length) { showDictionaryShell(rect, term, SubtitleShared.selectionIssue(term, kinds.at(-1))); return; }
-  showDictionaryShell(rect, term, uiText("请确认选中的内容和查询类型", "Confirm the selected text and lookup type"));
-  for (const kind of available) {
-    const label = kind === "word" ? uiText("查单词", "Look up word") : uiText("查短语", "Look up phrase");
-    dictionaryPanel.append(panelButton(label, () => startSelectedLookup(term, sentence, rect, kind), "nf-zh-secondary"));
-  }
-  dictionaryPanel.append(panelButton(uiText("取消", "Cancel"), closeInteractivePanels, "nf-zh-secondary"));
-  positionDictionaryPanel();
-}
-
 async function requestDictionary(term, sentence, rect, kind = "word") {
   const version = ++lookupVersion;
   if (lookupRequestId) chrome.runtime.sendMessage({ type: "CANCEL_LOOKUP", requestId: lookupRequestId }).catch(() => {});
@@ -569,8 +557,10 @@ function renderDictionary(entry) {
   const close = panelButton("×", closeInteractivePanels, "nf-zh-close"); header.append(word, close);
   dictionaryPanel.append(header);
   if (entry.pronunciation || entry.partOfSpeech) appendText(dictionaryPanel, [entry.pronunciation, entry.partOfSpeech].filter(Boolean).join(" · "), "nf-zh-meta");
+  if (entry.lemma) appendText(dictionaryPanel, `${uiText("原形：", "Base form: ")}${entry.lemma}`, "nf-zh-meta");
   if (entry.formNote) appendText(dictionaryPanel, `${uiText("词形：", "Form: ")}${entry.formNote}`, "nf-zh-meta");
   for (const definition of entry.definitions || []) appendText(dictionaryPanel, `• ${definition}`);
+  if (entry.usageNote) appendText(dictionaryPanel, `${uiText("说明：", "Usage: ")}${entry.usageNote}`, "nf-zh-meta");
   // The definitions already explain the word. Keep contextualMeaning in the
   // data for Anki, but avoid repeating a near-identical definition in the UI.
   appendBilingualExample(dictionaryPanel, uiText("视频原句", "Video sentence"), entry.videoSentence, entry.videoSentenceTranslation);
@@ -629,9 +619,11 @@ async function openAnkiEditor(entry) {
   const deck = addEditorField("deck", uiText("牌组", "Deck"), sessionDeck || settings.ankiDeck, "select");
   const fields = {
     term: addEditorField("term", uiText("词语", "Term"), entry.term || entry.normalizedTerm),
+    ...(entry.lemma ? { lemma: addEditorField("lemma", uiText("原形", "Base form"), entry.lemma) } : {}),
     ...(entry.formNote ? { formNote: addEditorField("formNote", uiText("词形说明", "Word form"), entry.formNote) } : {}),
     partOfSpeech: addEditorField("partOfSpeech", uiText("词性", "Part of speech"), entry.partOfSpeech),
     meaning: addEditorField("meaning", uiText("释义", "Meaning"), (entry.definitions || []).join("；"), "textarea"),
+    ...(entry.usageNote ? { usageNote: addEditorField("usageNote", uiText("用法说明", "Usage note"), entry.usageNote, "textarea") } : {}),
     videoSentence: addEditorField("videoSentence", uiText("视频原句", "Video sentence"), entry.videoSentence, "textarea"),
     videoTranslation: addEditorField("videoTranslation", uiText("视频原句译文", "Video sentence translation"), entry.videoSentenceTranslation, "textarea"),
     tags: addEditorField("tags", uiText("标签", "Tags"), [settings.ankiTags, ...SubtitleShared.sourceTags(entry.sourceTitle, location.hostname)].filter(Boolean).join(" "))
