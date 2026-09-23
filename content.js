@@ -19,7 +19,7 @@ const DEFAULTS = {
   ankiUrl: "http://127.0.0.1:8765",
   ankiDeck: "Default",
   ankiModel: "Basic",
-  ankiFieldMap: { term: "Front", meaning: "Back", videoSentence: "", generatedExample: "", exampleTranslation: "", source: "" },
+  ankiFieldMap: { term: "Front", meaning: "Back", videoSentence: "", videoTranslation: "", generatedExample: "", exampleTranslation: "", source: "" },
   ankiTags: "subtitle-learning"
 };
 
@@ -434,7 +434,9 @@ async function requestDictionary(term, sentence, rect) {
   lookupRequestId = `lookup-${Date.now()}-${version}`;
   showDictionaryShell(rect, term, uiText("正在查询…", "Looking up…"));
   try {
-    const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, sentence, source: settings.source, target: settings.target });
+    const visibleTranslation = translatedLine.textContent.trim();
+    const videoSentenceTranslation = visibleTranslation && visibleTranslation !== "..." ? visibleTranslation : "";
+    const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, sentence, videoSentenceTranslation, source: settings.source, target: settings.target });
     if (version !== lookupVersion || !videoPaused) return;
     if (!response?.ok) throw new Error(response?.error || uiText("查词失败", "Lookup failed"));
     lastDictionaryEntry = { ...response.entry, videoSentence: sentence, sourceUrl: location.href, sourceTitle: document.title };
@@ -465,13 +467,8 @@ function renderDictionary(entry) {
   if (entry.pronunciation || entry.partOfSpeech) appendText(dictionaryPanel, [entry.pronunciation, entry.partOfSpeech].filter(Boolean).join(" · "), "nf-zh-meta");
   for (const definition of entry.definitions || []) appendText(dictionaryPanel, `• ${definition}`);
   if (entry.contextualMeaning) appendLabeled(dictionaryPanel, uiText("语境释义", "In context"), entry.contextualMeaning);
-  appendLabeled(dictionaryPanel, uiText("视频原句", "Video sentence"), entry.videoSentence);
-  if (entry.generatedExample) {
-    const translation = entry.generatedExampleTranslation && entry.generatedExampleTranslation !== entry.generatedExample
-      ? `\n${entry.generatedExampleTranslation}`
-      : "";
-    appendLabeled(dictionaryPanel, uiText("新例句", "New example"), `${entry.generatedExample}${translation}`);
-  }
+  appendBilingualExample(dictionaryPanel, uiText("视频原句", "Video sentence"), entry.videoSentence, entry.videoSentenceTranslation);
+  appendBilingualExample(dictionaryPanel, uiText("新例句", "New example"), entry.generatedExample, entry.generatedExampleTranslation);
   dictionaryPanel.append(panelButton(
     settings.ankiEnabled ? uiText("添加到 Anki", "Add to Anki") : uiText("设置 Anki", "Set up Anki"),
     () => settings.ankiEnabled ? openAnkiEditor(entry) : openAnkiSettings(),
@@ -503,6 +500,17 @@ function positionDictionaryPanel() {
 
 function appendText(parent, text, className = "") { const p = document.createElement("p"); p.className = className; p.textContent = text || ""; parent.append(p); }
 function appendLabeled(parent, label, text) { if (!text) return; const wrap = document.createElement("div"); const strong = document.createElement("b"); strong.textContent = label; const p = document.createElement("p"); p.textContent = text; wrap.append(strong, p); parent.append(wrap); }
+function appendBilingualExample(parent, label, original, translation) {
+  if (!original && !translation) return;
+  const wrap = document.createElement("div"); wrap.className = "nf-zh-example";
+  const strong = document.createElement("b"); strong.textContent = label; wrap.append(strong);
+  if (original) appendText(wrap, original, "nf-zh-example-original");
+  if (translation && translation !== original) {
+    const translationLabel = document.createElement("span"); translationLabel.className = "nf-zh-example-label"; translationLabel.textContent = uiText("译文", "Translation");
+    wrap.append(translationLabel); appendText(wrap, translation, "nf-zh-example-translation");
+  }
+  parent.append(wrap);
+}
 function panelButton(label, handler, className = "") { const button = document.createElement("button"); button.type = "button"; button.className = className; button.textContent = label; button.addEventListener("click", handler); return button; }
 function renderPanelMessage(panel, message, error = false) { panel.replaceChildren(); const p = document.createElement("p"); p.className = error ? "nf-zh-error" : ""; p.textContent = message; panel.append(p, panelButton("×", closeInteractivePanels, "nf-zh-close")); }
 
@@ -516,6 +524,7 @@ async function openAnkiEditor(entry) {
     term: addEditorField("term", uiText("词语", "Term"), entry.term || entry.normalizedTerm),
     meaning: addEditorField("meaning", uiText("释义", "Meaning"), entry.contextualMeaning || (entry.definitions || []).join("；"), "textarea"),
     videoSentence: addEditorField("videoSentence", uiText("视频原句", "Video sentence"), entry.videoSentence, "textarea"),
+    videoTranslation: addEditorField("videoTranslation", uiText("视频原句译文", "Video sentence translation"), entry.videoSentenceTranslation, "textarea"),
     generatedExample: addEditorField("generatedExample", uiText("新例句", "New example"), entry.generatedExample, "textarea"),
     exampleTranslation: addEditorField("exampleTranslation", uiText("例句翻译", "Example translation"), entry.generatedExampleTranslation, "textarea"),
     source: addEditorField("source", uiText("来源", "Source"), `${entry.sourceTitle}\n${entry.sourceUrl}`, "textarea"),

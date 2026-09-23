@@ -115,7 +115,11 @@ async function lookupWord(message, signal) {
   if (!term) throw new Error("请选择不超过 80 个字符的单词或短语");
   const sentence = String(message.sentence || "").trim().slice(0, 500);
   const cacheKey = JSON.stringify([settings.serviceUrl, message.source, message.target, term, sentence]);
-  if (dictionaryCache.has(cacheKey)) return dictionaryCache.get(cacheKey);
+  let videoSentenceTranslation = String(message.videoSentenceTranslation || "").trim().slice(0, 500);
+  if (dictionaryCache.has(cacheKey)) {
+    if (!videoSentenceTranslation && sentence) videoSentenceTranslation = await translateWithLlamaCpp(sentence, [], settings, signal);
+    return { ...dictionaryCache.get(cacheKey), videoSentenceTranslation };
+  }
   const model = await discoverModel(settings.serviceUrl);
   const messages = DictionaryLib.buildDictionaryMessages({ term, sentence, source: message.source, target: message.target });
   const endpoint = serviceEndpoint(settings.serviceUrl, "/v1/chat/completions");
@@ -133,10 +137,33 @@ async function lookupWord(message, signal) {
     if (!/HTTP 400|response.format|json.schema|unsupported|unknown (field|parameter)/i.test(error.message)) throw error;
     entry = await fetchWithTimeout(endpoint, settings.timeoutMs, basePayload, DictionaryLib.parseDictionaryResponse, signal);
   }
+  await repairGeneratedExample(entry, { term, sentence, source: message.source, target: message.target, model, endpoint, timeoutMs: settings.timeoutMs, signal });
   if (!entry.term) entry.term = term;
   dictionaryCache.set(cacheKey, entry);
   if (dictionaryCache.size > 200) dictionaryCache.delete(dictionaryCache.keys().next().value);
-  return entry;
+  if (!videoSentenceTranslation && sentence) videoSentenceTranslation = await translateWithLlamaCpp(sentence, [], settings, signal);
+  return { ...entry, videoSentenceTranslation };
+}
+
+async function repairGeneratedExample(entry, { term, sentence, source, target, model, endpoint, timeoutMs, signal }) {
+  const plan = DictionaryLib.classifyExamplePair(entry, term);
+  if (plan.action === "keep") return;
+  if (plan.action === "swap") {
+    [entry.generatedExample, entry.generatedExampleTranslation] = [entry.generatedExampleTranslation, entry.generatedExample];
+    return;
+  }
+  const targetExample = plan.targetExample;
+  if (!targetExample) return;
+  const sourceHint = source && source !== "auto" ? source : "与参考视频原句相同的语言";
+  const repaired = await fetchWithTimeout(endpoint, timeoutMs, {
+    model, stream: false, temperature: 0.1, max_tokens: 120,
+    messages: [
+      { role: "system", content: `把用户提供的例句翻译成${sourceHint}。译文必须自然地包含查询词“${term}”。只输出一行译文。` },
+      { role: "user", content: `目标语言代码：${target || "zh"}\n查询词：${term}\n参考视频原句：${sentence}\n待反向翻译的新例句：${targetExample}` }
+    ]
+  }, cleanOpenAiResponse, signal);
+  entry.generatedExample = repaired;
+  entry.generatedExampleTranslation = targetExample;
 }
 
 const ANKI_ACTIONS = new Set(["requestPermission", "version", "deckNames", "createDeck", "modelNames", "modelFieldNames", "canAddNotes", "addNote"]);

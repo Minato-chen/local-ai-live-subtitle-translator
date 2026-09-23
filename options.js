@@ -110,7 +110,7 @@ function validateLocalAddress(value) {
 
 const FIELD_SELECTS = {
   term: "ankiFieldTerm", meaning: "ankiFieldMeaning", videoSentence: "ankiFieldVideoSentence",
-  generatedExample: "ankiFieldGeneratedExample", exampleTranslation: "ankiFieldExampleTranslation", source: "ankiFieldSource"
+  videoTranslation: "ankiFieldVideoTranslation", generatedExample: "ankiFieldGeneratedExample", exampleTranslation: "ankiFieldExampleTranslation", source: "ankiFieldSource"
 };
 
 function syncAnkiControls() {

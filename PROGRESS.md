@@ -76,3 +76,10 @@
 - The dictionary card now always shows an Anki action. Before configuration it reads “设置 Anki” and opens the extension settings; after enabling Anki it reads “添加到 Anki” and opens the note editor.
 - Strengthened the dictionary prompt so the generated example stays in the source language and its translation stays in the target language; identical duplicate lines are hidden defensively.
 - Regression suite remains 20/20 passing.
+
+## Post-release fix — True bilingual example pairs
+
+- Dictionary entries now carry four explicit values: video sentence, video translation, generated source-language example, and generated example translation.
+- The already displayed subtitle translation is reused; if it is not ready, the background translates the video sentence once.
+- Hy-MT2 sometimes puts the target-language sentence in the source example field. The background now swaps obviously reversed fields or performs a bounded reverse-translation repair so the generated source example contains the selected term.
+- The dictionary UI labels each translation separately, and Anki settings/editor now include a dedicated video-translation field.

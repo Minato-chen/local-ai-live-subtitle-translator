@@ -32,6 +32,7 @@ Object.assign(I18N.en, {
   "词语字段": "Term field",
   "释义字段": "Meaning field",
   "视频原句字段": "Video sentence field",
+  "视频原句译文字段": "Video sentence translation field",
   "AI 新例句字段": "AI example field",
   "例句翻译字段": "Example translation field",
   "来源字段": "Source field",
