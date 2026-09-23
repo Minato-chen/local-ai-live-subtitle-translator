@@ -128,3 +128,8 @@
 - Definitions that look like full subtitle translations are rejected; the selected term alone gets one translation attempt to obtain a short gloss.
 - A generated example identical to the video sentence (ignoring punctuation and case) gets one isolated regeneration attempt. If it still fails validation, the duplicate is omitted.
 - Regression suite: 26/26 tests passing; JavaScript syntax and diff checks pass. Live Hy-MT2 behavior still needs a playback check.
+
+## Post-release update — Remove card source line
+
+- New Anki cards no longer include an automatic show title, season/episode, or playback timestamp. The editor no longer shows a source field; users can organize cards with their chosen deck.
+- Existing Anki cards are unchanged.

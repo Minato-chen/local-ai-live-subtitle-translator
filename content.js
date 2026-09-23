@@ -445,8 +445,7 @@ async function requestDictionary(term, sentence, rect) {
     lastDictionaryEntry = {
       ...response.entry,
       videoSentence: sentence,
-      sourceTitle: document.title,
-      reference: SubtitleShared.playbackReference({ title: document.title, hostname: location.hostname, seconds: activeVideo?.currentTime })
+      sourceTitle: document.title
     };
     renderDictionary(lastDictionaryEntry);
   } catch (error) {
@@ -539,7 +538,6 @@ async function openAnkiEditor(entry) {
     videoTranslation: addEditorField("videoTranslation", uiText("视频原句译文", "Video sentence translation"), entry.videoSentenceTranslation, "textarea"),
     generatedExample: addEditorField("generatedExample", uiText("新例句", "New example"), entry.generatedExample, "textarea"),
     exampleTranslation: addEditorField("exampleTranslation", uiText("例句翻译", "Example translation"), entry.generatedExampleTranslation, "textarea"),
-    ...(entry.reference ? { reference: addEditorField("reference", uiText("出处（可删）", "Reference (optional)"), entry.reference) } : {}),
     tags: addEditorField("tags", uiText("标签", "Tags"), [settings.ankiTags, ...SubtitleShared.sourceTags(entry.sourceTitle, location.hostname)].filter(Boolean).join(" "))
   };
   const newDeck = panelButton(uiText("新建牌组", "New deck"), () => createDeckFromEditor(deck), "nf-zh-secondary");

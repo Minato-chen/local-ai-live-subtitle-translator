@@ -62,3 +62,4 @@ These checks are blocked in the current environment because Netflix/browser inte
 - Subsequent compatibility restriction: only Basic notes with `Front`/`Back` are supported; other note types are visibly disabled in settings, while any deck remains selectable.
 - Added a lightweight dictionary quality gate: wrong-language definitions and example translations get one local translation retry, malformed pronunciation is hidden, and only a subtitle translation paired with the selected line is reused. The suite now passes 25/25 tests; semantic accuracy of fluent model output cannot be guaranteed by these checks.
 - Follow-up quality fix rejects sentence-like definitions and examples copied from the video sentence, with one narrow retry for each; the suite now passes 26/26 tests.
+- Automatic source and playback-time references were removed from newly created cards at the user's request; deck selection remains available for show-level organization.

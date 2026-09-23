@@ -61,7 +61,7 @@ AI definitions are learning aids rather than authoritative dictionary entries. A
 3. Choose any default deck. Currently only the `Basic` note type is supported; other note types are disabled and labeled in the list. The front is fixed to `Front` and the back to `Back`. A modified Basic template must still display those fields on the corresponding sides.
 4. After lookup, click **Add to Anki**, review or edit the content, deck, and tags, then confirm. You can explicitly create a subdeck such as `Subtitle Learning::Movie title` from this editor.
 
-The front contains only the word. The back combines part of speech and meanings on one line, followed by the video sentence and its translation, then the new example and its translation. When the page title and playback position allow it, an editable short reference is appended (title, recognizable Netflix season/episode, approximate time); unknown episode information is not guessed. The recommended default is one long-lived deck organized with platform/title tags. The extension never creates a deck merely because a movie is opened. Note contents are not stored in browser sync and are sent to local AnkiConnect only after confirmation.
+The front contains only the word. The back combines part of speech and meanings on one line, followed by the video sentence and its translation, then the new example and its translation. No source or timestamp is added. You can choose or manually create a deck for each show; the extension never creates a deck merely because a movie is opened. Note contents are not stored in browser sync and are sent to local AnkiConnect only after confirmation.
 
 ## Privacy and Disclaimer
 
