@@ -170,7 +170,7 @@ async function repairGeneratedExample(entry, { term, sentence, source, target, s
   entry.generatedExampleTranslation = targetExample;
 }
 
-const ANKI_ACTIONS = new Set(["requestPermission", "version", "deckNames", "createDeck", "modelNames", "modelFieldNames", "canAddNotes", "addNote"]);
+const ANKI_ACTIONS = new Set(["requestPermission", "version", "deckNames", "createDeck", "modelNames", "modelFieldNames", "modelFieldsOnTemplates", "canAddNotes", "addNote"]);
 async function invokeAnki(action, params = {}, explicitUrl) {
   if (!ANKI_ACTIONS.has(action)) throw new Error("不支持的 Anki 操作");
   const settings = await chrome.storage.sync.get(DEFAULTS);
@@ -196,7 +196,10 @@ async function addValidatedAnkiNote(note, ankiUrl) {
   const fields = models.includes(note?.modelName)
     ? await invokeAnki("modelFieldNames", { modelName: note.modelName }, ankiUrl)
     : [];
-  AnkiLib.validateNoteAgainstMetadata(note, { decks, models, fields });
+  const templates = models.includes(note?.modelName)
+    ? await invokeAnki("modelFieldsOnTemplates", { modelName: note.modelName }, ankiUrl)
+    : {};
+  AnkiLib.validateNoteAgainstMetadata(note, { decks, models, fields, templates });
   const canAdd = await invokeAnki("canAddNotes", { notes: [note] }, ankiUrl);
   if (!canAdd?.[0]) throw new Error("该卡片可能重复或字段无效");
   return invokeAnki("addNote", { note }, ankiUrl);

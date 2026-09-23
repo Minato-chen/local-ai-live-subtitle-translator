@@ -22,6 +22,7 @@ const DEFAULTS = {
 
 const ids = Object.keys(DEFAULTS);
 let loadedSettings = { ...DEFAULTS };
+let currentAnkiTemplateFields = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
   await initI18n();
@@ -53,11 +54,15 @@ document.getElementById("save").addEventListener("click", async () => {
     if (values.ankiEnabled) {
       validateLocalAddress(values.ankiUrl);
       if (!values.ankiDeck || !values.ankiModel) throw new Error("请选择默认牌组和笔记类型");
-      if (!values.ankiFieldMap.term || !values.ankiFieldMap.meaning) throw new Error("请映射词语和释义字段");
-      const selectedFields = Object.values(values.ankiFieldMap).filter(Boolean);
-      if (new Set(selectedFields).size !== selectedFields.length) throw new Error("每项卡片内容必须使用不同字段；未使用的内容请选择“不写入”");
+      if (!values.ankiFieldMap.term || !values.ankiFieldMap.cardBack) throw new Error("请映射正面单词和背面内容字段");
+      if (values.ankiFieldMap.term === values.ankiFieldMap.cardBack) throw new Error("正面与背面必须使用不同字段");
+      if (!currentAnkiTemplateFields) throw new Error("请先连接 Anki，读取卡片模板后再保存");
+      if (!Object.values(currentAnkiTemplateFields).some((sides) => sides?.[0]?.includes(values.ankiFieldMap.term) && sides?.[1]?.includes(values.ankiFieldMap.cardBack))) {
+        throw new Error("所选笔记类型的模板未在正反面显示这两个字段");
+      }
     }
     await chrome.storage.sync.set(values);
+    loadedSettings = values;
     status.textContent = "已保存";
     setTimeout(() => (status.textContent = ""), 1500);
   } catch (error) {
@@ -109,10 +114,7 @@ function validateLocalAddress(value) {
   }
 }
 
-const FIELD_SELECTS = {
-  term: "ankiFieldTerm", meaning: "ankiFieldMeaning", videoSentence: "ankiFieldVideoSentence",
-  videoTranslation: "ankiFieldVideoTranslation", generatedExample: "ankiFieldGeneratedExample", exampleTranslation: "ankiFieldExampleTranslation", source: "ankiFieldSource"
-};
+const FIELD_SELECTS = { term: "ankiFieldTerm", cardBack: "ankiFieldBack" };
 
 function syncAnkiControls() {
   const enabled = document.getElementById("ankiEnabled").checked;
@@ -142,16 +144,20 @@ async function refreshAnkiMetadata(showStatus) {
 }
 
 async function refreshAnkiFields() {
+  currentAnkiTemplateFields = null;
   const modelName = document.getElementById("ankiModel").value;
   if (!modelName) return;
   try {
-    const fields = await ankiAction("modelFieldNames", { modelName });
+    const [fields, templates] = await Promise.all([
+      ankiAction("modelFieldNames", { modelName }),
+      ankiAction("modelFieldsOnTemplates", { modelName })
+    ]);
+    currentAnkiTemplateFields = templates;
     const saved = { ...loadedSettings.ankiFieldMap, ...(await chrome.storage.sync.get({ ankiFieldMap: {} })).ankiFieldMap };
-    for (const [key, id] of Object.entries(FIELD_SELECTS)) {
-      const fallback = key === "term" ? fields[0] : key === "meaning" ? fields[1] : "";
-      fillSelect(document.getElementById(id), key === "term" || key === "meaning" ? fields : ["", ...fields], saved[key] ?? fallback);
-    }
-  } catch (error) { document.getElementById("ankiStatus").textContent = `字段读取失败：${error.message}`; }
+    fillSelect(document.getElementById(FIELD_SELECTS.term), fields, fields.includes(saved.term) ? saved.term : fields[0]);
+    const savedBack = saved.cardBack || saved.meaning;
+    fillSelect(document.getElementById(FIELD_SELECTS.cardBack), fields, fields.includes(savedBack) ? savedBack : fields[1]);
+  } catch (error) { currentAnkiTemplateFields = null; document.getElementById("ankiStatus").textContent = `字段读取失败：${error.message}`; }
 }
 
 function fillSelect(select, values, selected) {

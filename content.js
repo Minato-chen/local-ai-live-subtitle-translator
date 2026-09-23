@@ -19,7 +19,7 @@ const DEFAULTS = {
   ankiUrl: "http://127.0.0.1:8765",
   ankiDeck: "Default",
   ankiModel: "Basic",
-  ankiFieldMap: { term: "Front", meaning: "Back", videoSentence: "", videoTranslation: "", generatedExample: "", exampleTranslation: "", source: "" },
+  ankiFieldMap: { term: "Front", cardBack: "Back" },
   ankiTags: "subtitle-learning"
 };
 
@@ -439,7 +439,12 @@ async function requestDictionary(term, sentence, rect) {
     const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, sentence, videoSentenceTranslation, source: settings.source, target: settings.target });
     if (version !== lookupVersion || !videoPaused) return;
     if (!response?.ok) throw new Error(response?.error || uiText("查词失败", "Lookup failed"));
-    lastDictionaryEntry = { ...response.entry, videoSentence: sentence, sourceUrl: location.href, sourceTitle: document.title };
+    lastDictionaryEntry = {
+      ...response.entry,
+      videoSentence: sentence,
+      sourceTitle: document.title,
+      reference: SubtitleShared.playbackReference({ title: document.title, hostname: location.hostname, seconds: activeVideo?.currentTime })
+    };
     renderDictionary(lastDictionaryEntry);
   } catch (error) {
     if (version !== lookupVersion || !videoPaused) return;
@@ -525,12 +530,13 @@ async function openAnkiEditor(entry) {
   const deck = addEditorField("deck", uiText("牌组", "Deck"), sessionDeck || settings.ankiDeck, "select");
   const fields = {
     term: addEditorField("term", uiText("词语", "Term"), entry.term || entry.normalizedTerm),
-    meaning: addEditorField("meaning", uiText("释义", "Meaning"), entry.contextualMeaning || (entry.definitions || []).join("；"), "textarea"),
+    partOfSpeech: addEditorField("partOfSpeech", uiText("词性", "Part of speech"), entry.partOfSpeech),
+    meaning: addEditorField("meaning", uiText("释义", "Meaning"), (entry.definitions || []).join("；"), "textarea"),
     videoSentence: addEditorField("videoSentence", uiText("视频原句", "Video sentence"), entry.videoSentence, "textarea"),
     videoTranslation: addEditorField("videoTranslation", uiText("视频原句译文", "Video sentence translation"), entry.videoSentenceTranslation, "textarea"),
     generatedExample: addEditorField("generatedExample", uiText("新例句", "New example"), entry.generatedExample, "textarea"),
     exampleTranslation: addEditorField("exampleTranslation", uiText("例句翻译", "Example translation"), entry.generatedExampleTranslation, "textarea"),
-    source: addEditorField("source", uiText("来源", "Source"), `${entry.sourceTitle}\n${entry.sourceUrl}`, "textarea"),
+    ...(entry.reference ? { reference: addEditorField("reference", uiText("出处（可删）", "Reference (optional)"), entry.reference) } : {}),
     tags: addEditorField("tags", uiText("标签", "Tags"), [settings.ankiTags, ...SubtitleShared.sourceTags(entry.sourceTitle, location.hostname)].filter(Boolean).join(" "))
   };
   const newDeck = panelButton(uiText("新建牌组", "New deck"), () => createDeckFromEditor(deck), "nf-zh-secondary");

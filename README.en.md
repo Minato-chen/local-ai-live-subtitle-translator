@@ -58,10 +58,10 @@ AI definitions are learning aids rather than authoritative dictionary entries. L
 
 1. Install Anki Desktop and install [AnkiConnect](https://ankiweb.net/shared/info/2055492159) from AnkiWeb. Restart Anki and keep it running.
 2. Enable Anki in the extension settings, keep the default URL `http://127.0.0.1:8765`, and click **Connect and refresh**. The extension uses AnkiConnect's `requestPermission` flow; approve the extension origin if Anki asks. If CORS is still denied, inspect `webCorsOriginList` under **Tools → Add-ons → AnkiConnect → Config**. Do not expose the bind address to a LAN or the public internet.
-3. Choose a default deck, note type, and field mapping. Term and meaning are required; video sentence, generated example, example translation, and source are optional.
+3. Choose a default deck and note type, then map **front word** and **back content** to different fields. The Basic type uses `Front` and `Back`. Custom note types work when their card template displays the chosen front field on the front and the chosen back field on the back.
 4. After lookup, click **Add to Anki**, review or edit the content, deck, and tags, then confirm. You can explicitly create a subdeck such as `Subtitle Learning::Movie title` from this editor.
 
-The recommended default is one long-lived deck organized with platform/title tags. The extension never creates a deck merely because a movie is opened. Note contents are not stored in browser sync and are sent to local AnkiConnect only after confirmation.
+The front contains only the word. The back combines part of speech and meanings on one line, followed by the video sentence and its translation, then the new example and its translation. When the page title and playback position allow it, an editable short reference is appended (title, recognizable Netflix season/episode, approximate time); unknown episode information is not guessed. The recommended default is one long-lived deck organized with platform/title tags. The extension never creates a deck merely because a movie is opened. Note contents are not stored in browser sync and are sent to local AnkiConnect only after confirmation.
 
 ## Privacy and Disclaimer
 

@@ -103,3 +103,10 @@
 - Removed the separate “语境释义” block from the card because it repeated the regular definition; the contextual value remains available to the Anki editor.
 - Video sentence and generated example translations now render immediately below the source sentence on one compact `译文：...` line.
 - Centralized the fixed dictionary prompt template and specified non-overlapping definitions, context-only meaning, source-language example, and translated example rules.
+
+## Post-release update — Two-field Anki cards
+
+- Anki settings now map only a front-word field and a back-content field. Existing `meaning` mapping is reused as the back mapping until settings are saved again.
+- The back combines part of speech and definitions, both bilingual example pairs, and an optional editable playback reference. It no longer writes separate source or example fields.
+- Both settings and final submission check that the selected Anki card template displays the chosen fields on the expected sides.
+- Verification: 24/24 automated tests, JavaScript syntax checks, and `git diff --check` passed. Live Anki card appearance still requires a user-profile check with Anki Desktop running.
