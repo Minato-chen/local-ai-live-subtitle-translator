@@ -255,6 +255,12 @@ function showTranslation(text, version) {
   if (version !== requestVersion) return;
   translatedSource = lastSource;
   translatedLine.textContent = text;
+  if (lastDictionaryEntry?.videoSentence === lastSource && !lastDictionaryEntry.videoSentenceTranslation) {
+    lastDictionaryEntry.videoSentenceTranslation = text;
+    if (dictionaryPanel && !dictionaryPanel.hidden) renderDictionary(lastDictionaryEntry);
+    const editorTranslation = editorPanel?.querySelector('[name="videoTranslation"]');
+    if (editorTranslation && !editorTranslation.value) editorTranslation.value = text;
+  }
   statusLine.textContent = "";
   positionOverlay();
 }
@@ -516,6 +522,7 @@ function startSelectedLookup(term, sentence, rect, kind) {
 
 async function requestDictionary(term, sentence, rect, kind = "word") {
   const version = ++lookupVersion;
+  lastDictionaryEntry = null;
   if (lookupRequestId) chrome.runtime.sendMessage({ type: "CANCEL_LOOKUP", requestId: lookupRequestId }).catch(() => {});
   lookupRequestId = `lookup-${Date.now()}-${version}`;
   showDictionaryShell(rect, term, uiText("正在查询…", "Looking up…"));
@@ -526,6 +533,9 @@ async function requestDictionary(term, sentence, rect, kind = "word") {
     const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, kind, sentence, context, videoSentenceTranslation, source: settings.source, target: settings.target });
     if (version !== lookupVersion || !videoPaused) return;
     if (!response?.ok) throw new Error(response?.error || uiText("查词失败", "Lookup failed"));
+    if (!response.entry.videoSentenceTranslation && translatedSource === sentence) {
+      response.entry.videoSentenceTranslation = translatedLine.textContent.trim();
+    }
     lastDictionaryEntry = {
       ...response.entry,
       videoSentence: sentence,

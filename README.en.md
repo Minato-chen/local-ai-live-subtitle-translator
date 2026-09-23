@@ -58,6 +58,8 @@ AI definitions are learning aids rather than authoritative dictionary entries. A
 
 In auto mode, a kanji-only subtitle lookup checks recent original subtitle lines for kana evidence before treating it as Chinese. If the whole passage lacks kana, the script alone cannot reliably distinguish Japanese from Chinese; explicitly select the source language in settings.
 
+Lookup returns the meaning without waiting for a second full-sentence translation. If the subtitle translation is still pending, it is added to the dictionary card or an empty Anki editor field when ready. A concise valid non-JSON model reply can be accepted; only unusable output triggers a short meaning-only retry.
+
 ## Anki Integration
 
 1. Install Anki Desktop and install [AnkiConnect](https://ankiweb.net/shared/info/2055492159) from AnkiWeb. Restart Anki and keep it running.

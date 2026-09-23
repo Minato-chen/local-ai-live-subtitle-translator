@@ -122,25 +122,40 @@ async function lookupWord(message, signal) {
   let videoSentenceTranslation = String(message.videoSentenceTranslation || "").trim().slice(0, 500);
   if (videoSentenceTranslation && !DictionaryLib.isTargetLanguage(videoSentenceTranslation, message.target || settings.target || "zh")) videoSentenceTranslation = "";
   if (dictionaryCache.has(cacheKey)) {
-    if (!videoSentenceTranslation && sentence) videoSentenceTranslation = await translateWithLlamaCpp(sentence, [], settings, signal);
     return { ...dictionaryCache.get(cacheKey), videoSentenceTranslation };
   }
   const model = await discoverModel(settings.serviceUrl);
   const messages = DictionaryLib.buildDictionaryMessages({ term, sentence, source: sourceLanguage, target: message.target, kind });
   const endpoint = serviceEndpoint(settings.serviceUrl, "/v1/chat/completions");
   const basePayload = { model, stream: false, temperature: 0.1, max_tokens: 320, messages };
+  const targetLanguage = message.target || settings.target || "zh";
+  const parseEntry = (data) => DictionaryLib.parseDictionaryResponse(data, targetLanguage, term);
+  const meaningOnly = async () => {
+    const meaning = await fetchWithTimeout(endpoint, settings.timeoutMs, {
+      model, stream: false, temperature: 0, max_tokens: 64,
+      messages: DictionaryLib.buildContextMeaningMessages({ term, sentence, source: sourceLanguage, target: targetLanguage })
+    }, cleanOpenAiResponse, signal);
+    try { return DictionaryLib.entryFromMeaning(meaning, term, targetLanguage); }
+    catch { throw new Error("本地模型没有返回可用的简短释义，请重试"); }
+  };
   let entry;
   try {
     entry = await fetchWithTimeout(endpoint, settings.timeoutMs, {
       ...basePayload,
       response_format: DictionaryLib.dictionaryResponseFormat()
-    }, DictionaryLib.parseDictionaryResponse, signal);
+    }, parseEntry, signal);
   } catch (error) {
-    // Older OpenAI-compatible servers may reject llama.cpp's schema extension.
-    // Fall back only for an explicit unsupported-parameter response; malformed
-    // model output should remain visible instead of silently issuing a second request.
-    if (!/HTTP 400|response.format|json.schema|unsupported|unknown (field|parameter)/i.test(error.message)) throw error;
-    entry = await fetchWithTimeout(endpoint, settings.timeoutMs, basePayload, DictionaryLib.parseDictionaryResponse, signal);
+    if (/HTTP 400|response.format|json.schema|unsupported|unknown (field|parameter)/i.test(error.message)) {
+      try { entry = await fetchWithTimeout(endpoint, settings.timeoutMs, basePayload, parseEntry, signal); }
+      catch (retryError) {
+        if (!/词典返回格式无效|词典服务没有返回内容/.test(retryError.message)) throw retryError;
+        entry = await meaningOnly();
+      }
+    } else if (/词典返回格式无效|词典服务没有返回内容/.test(error.message)) {
+      // The translation-focused local model sometimes ignores JSON mode.
+      // Retry only the meaning, rather than repeating the full dictionary prompt.
+      entry = await meaningOnly();
+    } else throw error;
   }
   const resolvedKind = DictionaryLib.resolveLookupKind(kind, entry.kind, term);
   const resolvedIssue = SubtitleShared.selectionIssue(term, resolvedKind);
@@ -151,7 +166,6 @@ async function lookupWord(message, signal) {
   entry.kind = resolvedKind;
   dictionaryCache.set(cacheKey, entry);
   if (dictionaryCache.size > 200) dictionaryCache.delete(dictionaryCache.keys().next().value);
-  if (!videoSentenceTranslation && sentence) videoSentenceTranslation = await translateWithLlamaCpp(sentence, [], settings, signal);
   return { ...entry, videoSentenceTranslation };
 }
 

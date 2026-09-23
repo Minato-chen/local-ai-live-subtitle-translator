@@ -198,3 +198,9 @@
 - Auto source-language detection now checks up to eight recent original subtitle lines for kana when the selected line contains only Han characters. Explicit source-language settings still take precedence.
 - The resolved source language is shared across dictionary prompting, word-form checks, and cache keys, avoiding a Japanese prompt paired with Chinese quality checks.
 - Limitation: a kanji-only passage with no kana evidence remains ambiguous and requires explicit Japanese selection. Automated regression tests and syntax checks pass; manual playback testing remains.
+
+## Faster lookup and malformed model output recovery
+
+- Removed the second full-sentence translation from the blocking lookup path. The already-running subtitle translation fills the dictionary or empty Anki editor translation field asynchronously when available.
+- Accept concise valid plain-text meanings and JSON with harmless trailing commas; only unusable formatting triggers one short meaning-only request. Invalid content is still rejected.
+- Regression tests: 42/42 passing; JavaScript syntax and diff checks pass. Live latency and model behavior could not be measured because the local service was not running at 127.0.0.1:8080.

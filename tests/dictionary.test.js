@@ -12,6 +12,16 @@ test("parses fenced response", () => {
   const result = d.parseDictionaryResponse({ choices: [{ message: { content: '```json\n{"term":"run","definitions":["跑"]}\n```' } }] });
   assert.deepEqual(result.definitions, ["跑"]);
 });
+test("accepts a concise local-model meaning when JSON is ignored", () => {
+  const result = d.parseDictionaryResponse({ choices: [{ message: { content: "释义：父亲；爸爸" } }] }, "zh", "お父さん");
+  assert.deepEqual(result.definitions, ["父亲；爸爸"]);
+  assert.equal(result.term, "お父さん");
+  assert.equal(result.kind, "");
+});
+test("repairs harmless trailing commas in a JSON answer", () => {
+  const result = d.parseDictionaryResponse({ choices: [{ message: { content: '{"term":"犬","definitions":["狗",],}' } }] });
+  assert.deepEqual(result.definitions, ["狗"]);
+});
 test("rejects malformed or empty response", () => {
   assert.throws(() => d.parseDictionaryResponse({ choices: [{ message: { content: "nope" } }] }), /格式/);
   assert.throws(() => d.parseDictionaryResponse({ choices: [{ message: { content: "{}" } }] }), /有效释义/);
