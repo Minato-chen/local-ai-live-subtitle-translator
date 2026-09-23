@@ -175,3 +175,8 @@
 - Removed example-swap and regeneration requests, avoiding extra model calls caused by copied or malformed examples.
 - Regression tests: 33/33 passing; JavaScript syntax and diff checks pass. Existing Anki notes are unchanged; new notes use the simplified format.
 - Japanese morphological analysis is not bundled in this phase; evaluate it separately if live testing shows that prompt plus conservative checks remain insufficient.
+
+## Japanese basic part-of-speech labels
+
+- Japanese lookup now displays only noun, verb, or adjective labels in both the dictionary and Anki editor when the model's category maps clearly; other labels are omitted. Detailed conjugation remains separate in the optional word-form note.
+- English and Chinese display behavior is unchanged. Automated tests: 34/34 passing; syntax and diff checks pass. Live model output still needs manual review.

@@ -76,4 +76,12 @@ test("never shows invented Japanese noun conjugation", () => {
   const noun = d.sanitizeWordForm({ partOfSpeech: "noun", normalizedTerm: "お父さんです", formNote: "过去式形式" }, "お父さん", "ja");
   assert.equal(noun.normalizedTerm, "お父さん");
   assert.equal(noun.formNote, "");
+  assert.equal(noun.partOfSpeech, "名词");
+});
+test("Japanese displays only basic known parts of speech", () => {
+  assert.equal(d.sanitizeWordForm({ partOfSpeech: "一类动词（五段）" }, "話す", "ja").partOfSpeech, "动词");
+  assert.equal(d.sanitizeWordForm({ partOfSpeech: "i-adjective" }, "高い", "ja").partOfSpeech, "形容词");
+  assert.equal(d.sanitizeWordForm({ partOfSpeech: "助词" }, "は", "ja").partOfSpeech, "");
+  assert.equal(d.sanitizeWordForm({ partOfSpeech: "auxiliary verb" }, "です", "ja").partOfSpeech, "");
+  assert.equal(d.sanitizeWordForm({ partOfSpeech: "verb" }, "run", "en").partOfSpeech, "verb");
 });
