@@ -54,7 +54,8 @@ document.getElementById("save").addEventListener("click", async () => {
       validateLocalAddress(values.ankiUrl);
       if (!values.ankiDeck || !values.ankiModel) throw new Error("请选择默认牌组和笔记类型");
       if (!values.ankiFieldMap.term || !values.ankiFieldMap.meaning) throw new Error("请映射词语和释义字段");
-      if (values.ankiFieldMap.term === values.ankiFieldMap.meaning) throw new Error("词语和释义不能映射到同一字段");
+      const selectedFields = Object.values(values.ankiFieldMap).filter(Boolean);
+      if (new Set(selectedFields).size !== selectedFields.length) throw new Error("每项卡片内容必须使用不同字段；未使用的内容请选择“不写入”");
     }
     await chrome.storage.sync.set(values);
     status.textContent = "已保存";
@@ -145,10 +146,10 @@ async function refreshAnkiFields() {
   if (!modelName) return;
   try {
     const fields = await ankiAction("modelFieldNames", { modelName });
-    const saved = (await chrome.storage.sync.get({ ankiFieldMap: {} })).ankiFieldMap;
+    const saved = { ...loadedSettings.ankiFieldMap, ...(await chrome.storage.sync.get({ ankiFieldMap: {} })).ankiFieldMap };
     for (const [key, id] of Object.entries(FIELD_SELECTS)) {
       const fallback = key === "term" ? fields[0] : key === "meaning" ? fields[1] : "";
-      fillSelect(document.getElementById(id), key === "term" || key === "meaning" ? fields : ["", ...fields], saved[key] || fallback);
+      fillSelect(document.getElementById(id), key === "term" || key === "meaning" ? fields : ["", ...fields], saved[key] ?? fallback);
     }
   } catch (error) { document.getElementById("ankiStatus").textContent = `字段读取失败：${error.message}`; }
 }

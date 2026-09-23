@@ -91,3 +91,9 @@
 - Reverse example repair now uses the same minimal translation pathway as live subtitles with explicit reversed source/target languages.
 - Added script-level plausibility checks. Mixed-script or Arabic-contaminated output is discarded rather than shown as a valid example.
 - Regression suite: 23/23 tests passing.
+
+## Post-release fix — Basic model field collision
+
+- The supplied settings screenshot showed `Basic` with only `Front` and `Back`, while every optional value defaulted to `Back`. Because the note payload is keyed by field name, later values overwrote earlier values.
+- Optional mappings now default to empty (“不写入”) unless the user previously chose a real field; the defaults are merged without replacing explicit empty selections.
+- Settings validation and final note construction now reject duplicate field mappings, preventing silent overwrites.
