@@ -567,7 +567,7 @@ async function submitAnkiNote(deck, fields, button) {
   try {
     const values = Object.fromEntries(Object.entries(fields).filter(([key]) => key !== "tags").map(([key, field]) => [key, field.value]));
     const tags = fields.tags.value.split(/\s+/).filter(Boolean);
-    const note = AnkiLib.buildNote({ deckName: deck.value, modelName: settings.ankiModel, fieldMap: settings.ankiFieldMap, values, tags });
+    const note = AnkiLib.buildNote({ deckName: deck.value, modelName: "Basic", fieldMap: { term: "Front", cardBack: "Back" }, values, tags });
     const response = await chrome.runtime.sendMessage({ type: "ADD_ANKI_NOTE", note, ankiUrl: settings.ankiUrl });
     if (!response?.ok) throw new Error(response?.error || uiText("添加失败", "Add failed"));
     const noteId = response.noteId;

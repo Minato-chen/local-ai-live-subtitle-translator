@@ -110,3 +110,8 @@
 - The back combines part of speech and definitions, both bilingual example pairs, and an optional editable playback reference. It no longer writes separate source or example fields.
 - Both settings and final submission check that the selected Anki card template displays the chosen fields on the expected sides.
 - Verification: 24/24 automated tests, JavaScript syntax checks, and `git diff --check` passed. Live Anki card appearance still requires a user-profile check with Anki Desktop running.
+
+## Post-release update — Basic-only note type
+
+- Kept deck selection unrestricted, but disabled non-Basic note types in the settings list with a visible “currently only Basic” label.
+- Fixed note fields to `Front` and `Back`, removed field-mapping controls, and reject unsupported note types on final submission as well as settings save.

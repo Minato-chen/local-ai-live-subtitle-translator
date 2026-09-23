@@ -50,15 +50,14 @@ document.getElementById("save").addEventListener("click", async () => {
     values.contextLines = Math.max(0, Math.min(8, Number(values.contextLines) || 0));
     values.outlineWidth = Math.max(0, Math.min(6, Number(values.outlineWidth) || 0));
     values.backgroundOpacity = Math.max(0, Math.min(100, Number(values.backgroundOpacity) || 0));
-    values.ankiFieldMap = readFieldMap();
+    values.ankiModel = "Basic";
+    values.ankiFieldMap = { term: "Front", cardBack: "Back" };
     if (values.ankiEnabled) {
       validateLocalAddress(values.ankiUrl);
-      if (!values.ankiDeck || !values.ankiModel) throw new Error("请选择默认牌组和笔记类型");
-      if (!values.ankiFieldMap.term || !values.ankiFieldMap.cardBack) throw new Error("请映射正面单词和背面内容字段");
-      if (values.ankiFieldMap.term === values.ankiFieldMap.cardBack) throw new Error("正面与背面必须使用不同字段");
+      if (!values.ankiDeck) throw new Error("请选择默认牌组");
       if (!currentAnkiTemplateFields) throw new Error("请先连接 Anki，读取卡片模板后再保存");
-      if (!Object.values(currentAnkiTemplateFields).some((sides) => sides?.[0]?.includes(values.ankiFieldMap.term) && sides?.[1]?.includes(values.ankiFieldMap.cardBack))) {
-        throw new Error("所选笔记类型的模板未在正反面显示这两个字段");
+      if (!Object.values(currentAnkiTemplateFields).some((sides) => sides?.[0]?.includes("Front") && sides?.[1]?.includes("Back"))) {
+        throw new Error("Basic 模板未在正反面显示 Front 和 Back 字段");
       }
     }
     await chrome.storage.sync.set(values);
@@ -92,7 +91,6 @@ document.getElementById("outlineEnabled").addEventListener("change", syncStyleCo
 document.getElementById("backgroundEnabled").addEventListener("change", syncStyleControls);
 document.getElementById("ankiEnabled").addEventListener("change", syncAnkiControls);
 document.getElementById("checkAnki").addEventListener("click", () => refreshAnkiMetadata(true));
-document.getElementById("ankiModel").addEventListener("change", refreshAnkiFields);
 
 function syncStyleControls() {
   document.getElementById("outlineColor").disabled = !document.getElementById("outlineEnabled").checked;
@@ -113,8 +111,6 @@ function validateLocalAddress(value) {
     throw new Error("仅支持本机地址：127.0.0.1 或 localhost");
   }
 }
-
-const FIELD_SELECTS = { term: "ankiFieldTerm", cardBack: "ankiFieldBack" };
 
 function syncAnkiControls() {
   const enabled = document.getElementById("ankiEnabled").checked;
@@ -137,7 +133,16 @@ async function refreshAnkiMetadata(showStatus) {
     if (permission?.permission && permission.permission !== "granted") throw new Error("AnkiConnect 未授权此扩展，请在 Anki 中允许访问");
     const [version, decks, models] = await Promise.all([ankiAction("version"), ankiAction("deckNames"), ankiAction("modelNames")]);
     fillSelect(document.getElementById("ankiDeck"), decks, document.getElementById("ankiDeck").value || loadedSettings.ankiDeck || DEFAULTS.ankiDeck);
-    fillSelect(document.getElementById("ankiModel"), models, document.getElementById("ankiModel").value || loadedSettings.ankiModel || DEFAULTS.ankiModel);
+    const modelSelect = document.getElementById("ankiModel");
+    modelSelect.replaceChildren(...models.map((name) => {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name === "Basic" ? name : `${name}（目前只支持 Basic）`;
+      option.disabled = name !== "Basic";
+      return option;
+    }));
+    modelSelect.value = models.includes("Basic") ? "Basic" : "";
+    if (!modelSelect.value) throw new Error("未找到 Basic 笔记类型，请在 Anki 中恢复或创建 Basic");
     await refreshAnkiFields();
     status.textContent = `AnkiConnect v${version} · ${decks.length} 个牌组`;
   } catch (error) { if (showStatus) status.textContent = `连接失败：${error.message}`; }
@@ -145,18 +150,14 @@ async function refreshAnkiMetadata(showStatus) {
 
 async function refreshAnkiFields() {
   currentAnkiTemplateFields = null;
-  const modelName = document.getElementById("ankiModel").value;
-  if (!modelName) return;
+  if (document.getElementById("ankiModel").value !== "Basic") return;
   try {
     const [fields, templates] = await Promise.all([
-      ankiAction("modelFieldNames", { modelName }),
-      ankiAction("modelFieldsOnTemplates", { modelName })
+      ankiAction("modelFieldNames", { modelName: "Basic" }),
+      ankiAction("modelFieldsOnTemplates", { modelName: "Basic" })
     ]);
+    if (!fields.includes("Front") || !fields.includes("Back")) throw new Error("Basic 缺少 Front 或 Back 字段");
     currentAnkiTemplateFields = templates;
-    const saved = { ...loadedSettings.ankiFieldMap, ...(await chrome.storage.sync.get({ ankiFieldMap: {} })).ankiFieldMap };
-    fillSelect(document.getElementById(FIELD_SELECTS.term), fields, fields.includes(saved.term) ? saved.term : fields[0]);
-    const savedBack = saved.cardBack || saved.meaning;
-    fillSelect(document.getElementById(FIELD_SELECTS.cardBack), fields, fields.includes(savedBack) ? savedBack : fields[1]);
   } catch (error) { currentAnkiTemplateFields = null; document.getElementById("ankiStatus").textContent = `字段读取失败：${error.message}`; }
 }
 
@@ -164,5 +165,3 @@ function fillSelect(select, values, selected) {
   select.replaceChildren(...values.map((value) => { const option = document.createElement("option"); option.value = value; option.textContent = value || "不写入"; return option; }));
   select.value = selected;
 }
-
-function readFieldMap() { return Object.fromEntries(Object.entries(FIELD_SELECTS).map(([key, id]) => [key, document.getElementById(id).value])); }
