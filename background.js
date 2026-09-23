@@ -137,7 +137,7 @@ async function lookupWord(message, signal) {
     if (!/HTTP 400|response.format|json.schema|unsupported|unknown (field|parameter)/i.test(error.message)) throw error;
     entry = await fetchWithTimeout(endpoint, settings.timeoutMs, basePayload, DictionaryLib.parseDictionaryResponse, signal);
   }
-  await repairGeneratedExample(entry, { term, sentence, source: message.source, target: message.target, model, endpoint, timeoutMs: settings.timeoutMs, signal });
+  await repairGeneratedExample(entry, { term, sentence, source: message.source, target: message.target, settings, signal });
   if (!entry.term) entry.term = term;
   dictionaryCache.set(cacheKey, entry);
   if (dictionaryCache.size > 200) dictionaryCache.delete(dictionaryCache.keys().next().value);
@@ -145,23 +145,27 @@ async function lookupWord(message, signal) {
   return { ...entry, videoSentenceTranslation };
 }
 
-async function repairGeneratedExample(entry, { term, sentence, source, target, model, endpoint, timeoutMs, signal }) {
-  const plan = DictionaryLib.classifyExamplePair(entry, term);
+async function repairGeneratedExample(entry, { term, sentence, source, target, settings, signal }) {
+  const resolvedSource = DictionaryLib.inferSourceLanguage(source, sentence);
+  const resolvedTarget = target || settings.target || "zh";
+  const plan = DictionaryLib.classifyExamplePair(entry, term, resolvedSource, resolvedTarget);
   if (plan.action === "keep") return;
   if (plan.action === "swap") {
     [entry.generatedExample, entry.generatedExampleTranslation] = [entry.generatedExampleTranslation, entry.generatedExample];
     return;
   }
   const targetExample = plan.targetExample;
-  if (!targetExample) return;
-  const sourceHint = source && source !== "auto" ? source : "与参考视频原句相同的语言";
-  const repaired = await fetchWithTimeout(endpoint, timeoutMs, {
-    model, stream: false, temperature: 0.1, max_tokens: 120,
-    messages: [
-      { role: "system", content: `把用户提供的例句翻译成${sourceHint}。译文必须自然地包含查询词“${term}”。只输出一行译文。` },
-      { role: "user", content: `目标语言代码：${target || "zh"}\n查询词：${term}\n参考视频原句：${sentence}\n待反向翻译的新例句：${targetExample}` }
-    ]
-  }, cleanOpenAiResponse, signal);
+  if (!targetExample) {
+    entry.generatedExample = ""; entry.generatedExampleTranslation = ""; return;
+  }
+  // Hy-MT2 is a translation model. Use the same simple translation path that
+  // powers subtitles instead of asking it to follow a multi-field generation prompt.
+  const repaired = await translateWithLlamaCpp(targetExample, [], {
+    ...settings, source: resolvedTarget, target: resolvedSource
+  }, signal);
+  if (!DictionaryLib.isLanguagePlausible(repaired, resolvedSource)) {
+    entry.generatedExample = ""; entry.generatedExampleTranslation = ""; return;
+  }
   entry.generatedExample = repaired;
   entry.generatedExampleTranslation = targetExample;
 }

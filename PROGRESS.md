@@ -83,3 +83,11 @@
 - The already displayed subtitle translation is reused; if it is not ready, the background translates the video sentence once.
 - Hy-MT2 sometimes puts the target-language sentence in the source example field. The background now swaps obviously reversed fields or performs a bounded reverse-translation repair so the generated source example contains the selected term.
 - The dictionary UI labels each translation separately, and Anki settings/editor now include a dedicated video-translation field.
+
+## Post-release fix — Hy-MT2 language contamination
+
+- Confirmed the failure is a model-capability/prompt-shape interaction: Hy-MT2 is optimized for translation, and a multi-field reverse-generation prompt produced mixed Chinese, English, and Arabic.
+- Source language is now inferred from the video sentence when settings use auto-detect.
+- Reverse example repair now uses the same minimal translation pathway as live subtitles with explicit reversed source/target languages.
+- Added script-level plausibility checks. Mixed-script or Arabic-contaminated output is discarded rather than shown as a valid example.
+- Regression suite: 23/23 tests passing.
