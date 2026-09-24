@@ -7,7 +7,7 @@ Edge/Chrome 扩展：读取 Netflix 或 YouTube 播放器中的原字幕，通�
 ## 版本
 
 - 稳定版：从 [Microsoft Edge 扩展商店](https://microsoftedge.microsoft.com/addons/detail/odmlonebpcbphjogbopioojopjecioge)安装，当前为 `v2.0.4`。
-- 开发预览版：从 [GitHub Releases](https://github.com/Minato-chen/local-ai-live-subtitle-translator/releases) 下载标为 Pre-release 的 `v2.1.0-dev.1` ZIP，按下文步骤手动安装和更新。建议使用单独的浏览器配置文件，避免与商店版同时运行。
+- GitHub 正式版：从 [GitHub Releases](https://github.com/Minato-chen/local-ai-live-subtitle-translator/releases) 下载 `v2.1.0` ZIP，按下文步骤手动安装和更新。GitHub 版本不会通过 Edge 商店自动更新；建议使用单独的浏览器配置文件，避免与商店版同时运行。
 
 ## 安装
 
@@ -29,7 +29,7 @@ Edge/Chrome 扩展：读取 Netflix 或 YouTube 播放器中的原字幕，通�
    curl -LsSf https://llama.app/install.sh | sh
    ```
 
-2. 从 Edge 扩展商店安装稳定版；若使用开发预览版，解压 Release 中的 ZIP，在扩展管理页面开启开发人员模式，选择“加载解压缩的扩展”，并选中包含 `manifest.json` 的目录。
+2. 从 Edge 扩展商店安装商店版；若使用 GitHub 正式版，解压 Release 中的 ZIP，在扩展管理页面开启开发人员模式，选择“加载解压缩的扩展”，并选中包含 `manifest.json` 的目录。
 
    Edge：`edge://extensions`
 
