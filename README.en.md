@@ -7,11 +7,11 @@ An Edge/Chrome extension that reads the subtitles displayed by Netflix or YouTub
 ## Versions
 
 - Stable: Install from [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/odmlonebpcbphjogbopioojopjecioge). The current store version is `v2.0.4`.
-- Development preview: Download a ZIP marked Pre-release from [GitHub Releases](https://github.com/Minato-chen/local-ai-live-subtitle-translator/releases) and install or update it manually as described below. Use a separate browser profile to avoid running it alongside the store version.
+- Development preview: Download the `v2.1.0-dev.1` ZIP marked Pre-release from [GitHub Releases](https://github.com/Minato-chen/local-ai-live-subtitle-translator/releases) and install or update it manually as described below. Use a separate browser profile to avoid running it alongside the store version.
 
 ## Installation
 
-Watch this [video](https://youtu.be/2KG4V-mdfIE).
+See the [installation and setup video](https://youtu.be/2KG4V-mdfIE).
 
 1. Install llama.cpp.
 

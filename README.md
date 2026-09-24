@@ -7,11 +7,11 @@ Edge/Chrome 扩展：读取 Netflix 或 YouTube 播放器中的原字幕，通�
 ## 版本
 
 - 稳定版：从 [Microsoft Edge 扩展商店](https://microsoftedge.microsoft.com/addons/detail/odmlonebpcbphjogbopioojopjecioge)安装，当前为 `v2.0.4`。
-- 开发预览版：从 [GitHub Releases](https://github.com/Minato-chen/local-ai-live-subtitle-translator/releases) 下载标为 Pre-release 的 ZIP，按下文步骤手动安装和更新。建议使用单独的浏览器配置文件，避免与商店版同时运行。
+- 开发预览版：从 [GitHub Releases](https://github.com/Minato-chen/local-ai-live-subtitle-translator/releases) 下载标为 Pre-release 的 `v2.1.0-dev.1` ZIP，按下文步骤手动安装和更新。建议使用单独的浏览器配置文件，避免与商店版同时运行。
 
 ## 安装
 
-参考这个视频[video](https://youtu.be/2KG4V-mdfIE)。
+安装和启动示例：[观看演示视频](https://youtu.be/2KG4V-mdfIE)。
 
 1. 安装 llama.cpp。
 
