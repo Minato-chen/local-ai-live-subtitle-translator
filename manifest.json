@@ -11,7 +11,7 @@
     "48": "icons/icon-idle-48.png",
     "128": "icons/icon-idle-128.png"
   },
-  "permissions": ["storage"],
+  "permissions": ["storage", "contextMenus", "activeTab"],
   "host_permissions": [
     "https://www.netflix.com/*",
     "https://www.youtube.com/*",
@@ -24,8 +24,8 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.netflix.com/*", "https://www.youtube.com/*"],
-      "js": ["lib/shared.js", "lib/anki.js", "content.js"],
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["lib/shared.js", "lib/anki.js", "lib/web-translate.js", "content.js", "web-content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

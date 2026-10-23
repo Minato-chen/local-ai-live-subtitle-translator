@@ -3,6 +3,6 @@
     "message": "本地 AI 实时字幕翻译"
   },
   "extensionDescription": {
-    "message": "使用本地 AI 翻译 Netflix 和 YouTube 字幕，并在暂停时查词及按需添加到 Anki。"
+    "message": "使用本地 AI 实时翻译 Netflix / YouTube 字幕、双语对照翻译网页、划词查词翻译并按需添加到 Anki。"
   }
 }

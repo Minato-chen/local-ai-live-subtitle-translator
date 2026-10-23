@@ -1,13 +1,44 @@
 document.addEventListener("DOMContentLoaded", async () => {
   await initI18n();
-  const { enabled = true, serviceUrl = "http://127.0.0.1:8080", uiLanguage = "zh" } = await chrome.storage.sync.get({
+  const {
+    enabled = true,
+    webSelectionEnabled = true,
+    serviceUrl = "http://127.0.0.1:8080",
+    uiLanguage = "zh"
+  } = await chrome.storage.sync.get({
     enabled: true,
+    webSelectionEnabled: true,
     serviceUrl: "http://127.0.0.1:8080",
     uiLanguage: "zh"
   });
   document.getElementById("enabled").checked = enabled;
+  document.getElementById("webSelectionEnabled").checked = webSelectionEnabled;
   checkServiceStatus(serviceUrl, uiLanguage);
+  syncPageTranslationButton(uiLanguage);
 });
+
+async function syncPageTranslationButton(lang) {
+  const button = document.getElementById("togglePageTranslate");
+  if (!button) return;
+  const isEn = lang === "en";
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || !/^https?:/i.test(tab.url || "")) {
+      button.disabled = true;
+      return;
+    }
+    const response = await chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE_TRANSLATION_STATE" });
+    updatePageButtonLabel(button, Boolean(response?.active), isEn);
+  } catch {
+    updatePageButtonLabel(button, false, isEn);
+  }
+}
+
+function updatePageButtonLabel(button, active, isEn) {
+  button.textContent = active
+    ? (isEn ? "Restore Original Page" : "还原网页原文")
+    : (isEn ? "Translate Current Page (Bilingual)" : "双语翻译当前网页");
+}
 
 async function checkServiceStatus(serviceUrl, lang) {
   const dot = document.getElementById("statusDot");
@@ -37,6 +68,24 @@ async function checkServiceStatus(serviceUrl, lang) {
 
 document.getElementById("enabled").addEventListener("change", (event) => {
   chrome.storage.sync.set({ enabled: event.target.checked });
+});
+
+document.getElementById("webSelectionEnabled").addEventListener("change", (event) => {
+  chrome.storage.sync.set({ webSelectionEnabled: event.target.checked });
+});
+
+document.getElementById("togglePageTranslate").addEventListener("click", async () => {
+  const button = document.getElementById("togglePageTranslate");
+  const { uiLanguage = "zh" } = await chrome.storage.sync.get({ uiLanguage: "zh" });
+  const isEn = uiLanguage === "en";
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+    const response = await chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_PAGE_TRANSLATION" });
+    updatePageButtonLabel(button, Boolean(response?.active), isEn);
+  } catch {
+    // Content script might not be loaded if tab was opened before extension install/reload
+  }
 });
 
 document.getElementById("options").addEventListener("click", () => {

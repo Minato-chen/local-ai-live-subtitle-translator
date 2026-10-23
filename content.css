@@ -118,3 +118,284 @@
 }
 
 #nf-zh-overlay [hidden] { display: none !important; }
+
+/* =========================================================================
+   Webpage Bilingual Translation & Selection Lookup UI
+   ========================================================================= */
+
+#lai-web-translator-root [hidden] {
+  display: none !important;
+}
+
+#lai-web-translator-root {
+  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.45;
+  color: #f5f5f5;
+}
+
+#lai-web-translator-root .lai-selection-trigger {
+  position: fixed;
+  z-index: 2147483646;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(24, 24, 24, 0.95);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 28px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  user-select: none;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+#lai-web-translator-root .lai-selection-trigger:hover {
+  background: #e50914;
+  border-color: #ff4d4f;
+  transform: scale(1.06);
+}
+
+#lai-web-translator-root .lai-web-panel {
+  position: fixed;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 16px));
+  max-height: min(520px, calc(100vh - 16px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 14px;
+  border: 1px solid #4a4a4a;
+  border-radius: 10px;
+  background: rgba(24, 24, 24, 0.98);
+  color: #f5f5f5;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.55);
+  user-select: text;
+}
+
+#lai-web-translator-root .lai-anki-modal {
+  left: 50%;
+  top: 50%;
+  width: min(480px, calc(100vw - 24px));
+  transform: translate(-50%, -50%);
+}
+
+#lai-web-translator-root .lai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#lai-web-translator-root .lai-panel-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  word-break: break-word;
+}
+
+#lai-web-translator-root .lai-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+#lai-web-translator-root .lai-panel-loading {
+  margin: 8px 0;
+  color: #ccc;
+}
+
+#lai-web-translator-root .lai-panel-section,
+#lai-web-translator-root .lai-panel-example {
+  margin-top: 10px;
+}
+
+#lai-web-translator-root .lai-panel-section b,
+#lai-web-translator-root .lai-panel-example b {
+  display: block;
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 2px;
+}
+
+#lai-web-translator-root .lai-panel-meaning {
+  margin: 4px 0;
+  color: #fff;
+  white-space: pre-wrap;
+}
+
+#lai-web-translator-root .lai-example-original {
+  margin: 4px 0 2px;
+  color: #ececec;
+  font-size: 13px;
+}
+
+#lai-web-translator-root .lai-example-translation {
+  margin: 2px 0 0;
+  color: #bdbdbd;
+  font-size: 13px;
+}
+
+#lai-web-translator-root .lai-selection-source {
+  margin: 6px 0 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ccc;
+  font-size: 12.5px;
+  max-height: 90px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+#lai-web-translator-root .lai-selection-target {
+  margin: 8px 0;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+#lai-web-translator-root .lai-panel-error {
+  margin: 8px 0 4px;
+  color: #ff8a80;
+  font-size: 13px;
+}
+
+#lai-web-translator-root .lai-panel-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+#lai-web-translator-root button {
+  font-family: inherit;
+  cursor: pointer;
+  border: 0;
+  border-radius: 5px;
+}
+
+#lai-web-translator-root .lai-btn-primary {
+  padding: 6px 12px;
+  background: #e50914;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+#lai-web-translator-root .lai-btn-secondary {
+  padding: 6px 12px;
+  background: #3a3a3a;
+  color: #f0f0f0;
+  font-size: 13px;
+}
+
+#lai-web-translator-root .lai-btn-ghost {
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ddd;
+  font-size: 12px;
+}
+
+#lai-web-translator-root .lai-btn-close {
+  padding: 0 4px;
+  background: transparent;
+  color: #ccc;
+  font-size: 19px;
+  line-height: 1;
+}
+
+#lai-web-translator-root .lai-editor-label {
+  display: block;
+  margin-top: 9px;
+  color: #ddd;
+  font-size: 13px;
+}
+
+#lai-web-translator-root .lai-editor-label input,
+#lai-web-translator-root .lai-editor-label textarea,
+#lai-web-translator-root .lai-editor-label select {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px;
+  color: #fff;
+  background: #292929;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font: inherit;
+}
+
+#lai-web-translator-root .lai-editor-label textarea {
+  min-height: 52px;
+  resize: vertical;
+}
+
+#lai-web-translator-root .lai-page-status {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483645;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(24, 24, 24, 0.94);
+  color: #f5f5f5;
+  font-size: 12.5px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+#lai-web-translator-root .lai-pill-restore {
+  padding: 3px 9px;
+  background: #e50914;
+  color: #fff;
+  font-size: 12px;
+  border-radius: 999px;
+}
+
+#lai-web-translator-root .lai-pill-close {
+  padding: 0 3px;
+  background: transparent;
+  color: #aaa;
+  font-size: 16px;
+  line-height: 1;
+}
+
+font.lai-bilingual-translation {
+  display: block;
+  margin: 6px 0 4px;
+  padding: 2px 0 2px 10px;
+  border-left: 2.5px solid #e50914;
+  font-size: 0.95em;
+  line-height: 1.55;
+  color: inherit;
+  opacity: 0.9;
+  font-weight: normal;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+font.lai-bilingual-translation.lai-bilingual-loading {
+  opacity: 0.6;
+  font-size: 0.88em;
+}
+
+font.lai-bilingual-translation.lai-bilingual-error {
+  color: #d9534f;
+  opacity: 0.85;
+  font-size: 0.86em;
+}

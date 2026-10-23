@@ -15,8 +15,12 @@
   </div>
   <label>语言 / Language<select id="uiLanguage"><option value="zh">中文</option><option value="en">English</option></select></label>
   <label class="check"><input id="enabled" type="checkbox"> 启用实时翻译</label>
-  <p class="hint">暂停视频后可选择原字幕查词，并按需添加到 Anki。</p>
-  <button id="options">翻译服务设置</button>
+  <label class="check"><input id="webSelectionEnabled" type="checkbox"> 启用网页划词翻译</label>
+  <p class="hint">支持视频暂停查词、网页划词查词/翻译（点击“译”图标或右键菜单）及整页双语翻译。</p>
+  <div class="popup-actions">
+    <button id="togglePageTranslate" type="button" class="secondary-btn">双语翻译当前网页</button>
+    <button id="options" type="button">翻译服务设置</button>
+  </div>
   <script src="i18n.js"></script><script src="popup.js"></script>
 </body>
 </html>

@@ -20,6 +20,31 @@ main {
   padding: 18px;
 }
 
+.popup-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.popup-actions button {
+  width: 100%;
+}
+
+button.secondary-btn {
+  background: #2f2f2f;
+  border: 1px solid #4a4a4a;
+}
+
+button.secondary-btn:hover:not(:disabled) {
+  background: #3d3d3d;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .status-card {
   margin: 14px 0 16px;
   padding: 10px 12px;

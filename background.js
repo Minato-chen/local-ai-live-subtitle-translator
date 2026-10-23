@@ -1,16 +1,18 @@
-importScripts("lib/shared.js", "lib/languages/en.js", "lib/languages/zh.js", "lib/languages/ja.js", "lib/languages/index.js", "lib/dictionary.js", "lib/anki.js");
+importScripts("lib/shared.js", "lib/languages/en.js", "lib/languages/zh.js", "lib/languages/ja.js", "lib/languages/index.js", "lib/dictionary.js", "lib/anki.js", "lib/web-translate.js");
 
 const DEFAULTS = {
   source: "auto",
   target: "zh",
   timeoutMs: 12000,
   serviceUrl: "http://127.0.0.1:8080",
-  ankiUrl: "http://127.0.0.1:8765"
+  ankiUrl: "http://127.0.0.1:8765",
+  uiLanguage: "zh"
 };
 
 const activeTranslations = new Map();
 const activeLookups = new Map();
 const activeFragments = new Map();
+const activeWebTranslations = new Map();
 const dictionaryCache = new Map();
 const DICTIONARY_CACHE_VERSION = "meaning-retry-v5";
 const modelCache = new Map();
@@ -18,6 +20,43 @@ const ICONS = {
   idle: { 16: "icons/icon-idle-16.png", 32: "icons/icon-idle-32.png", 48: "icons/icon-idle-48.png", 128: "icons/icon-idle-128.png" },
   active: { 16: "icons/icon-active-16.png", 32: "icons/icon-active-32.png", 48: "icons/icon-active-48.png", 128: "icons/icon-active-128.png" }
 };
+
+async function setupContextMenus() {
+  if (!chrome.contextMenus) return;
+  const { uiLanguage = "zh" } = await chrome.storage.sync.get({ uiLanguage: "zh" });
+  const isEn = uiLanguage === "en";
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "toggle-page-translation",
+      title: isEn ? "Translate Page (Bilingual) / Restore" : "双语翻译当前网页 / 还原原文",
+      contexts: ["page", "frame"]
+    }, () => { void chrome.runtime.lastError; });
+    chrome.contextMenus.create({
+      id: "translate-selection",
+      title: isEn ? "Translate / Look Up Selection with Local AI" : "使用本地 AI 翻译 / 查词选中内容",
+      contexts: ["selection"]
+    }, () => { void chrome.runtime.lastError; });
+  });
+}
+
+chrome.runtime.onInstalled?.addListener(() => { setupContextMenus(); });
+chrome.runtime.onStartup?.addListener(() => { setupContextMenus(); });
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.uiLanguage) setupContextMenus();
+});
+
+chrome.contextMenus?.onClicked.addListener((info, tab) => {
+  if (!tab?.id) return;
+  if (info.menuItemId === "toggle-page-translation") {
+    chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_PAGE_TRANSLATION" }).catch(() => {});
+  } else if (info.menuItemId === "translate-selection") {
+    chrome.tabs.sendMessage(
+      tab.id,
+      { type: "TRANSLATE_SELECTION_FROM_MENU", selectionText: info.selectionText || "" },
+      info.frameId != null ? { frameId: info.frameId } : undefined
+    ).catch(() => {});
+  }
+});
 
 function isSupportedPage(url) {
   try {
@@ -88,6 +127,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  if (message?.type === "TRANSLATE_WEB_TEXT") {
+    const controller = new AbortController();
+    const key = requestKey(message.requestId, sender);
+    if (message.requestId) activeWebTranslations.set(key, controller);
+    translateWebText(message.text, message.source, message.target, controller.signal)
+      .then((translatedText) => sendResponse({ ok: true, translatedText }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }))
+      .finally(() => { if (message.requestId) activeWebTranslations.delete(key); });
+    return true;
+  }
+
+  if (message?.type === "CANCEL_WEB_TRANSLATION") {
+    activeWebTranslations.get(requestKey(message.requestId, sender))?.abort();
+    sendResponse({ ok: true });
+    return false;
+  }
+
   if (message?.type === "LOOKUP_WORD") {
     const controller = new AbortController();
     const key = requestKey(message.requestId, sender);
@@ -154,6 +210,42 @@ async function translateFragment(text, source, target, signal) {
   }, cleanOpenAiResponse, signal);
   try { return await request(); }
   catch (error) {
+    if (error.code !== "PROMPT_ECHO") throw error;
+    return request(true);
+  }
+}
+
+async function translateWebText(text, source, target, signal) {
+  const cleanText = String(text || "").trim().slice(0, 2500);
+  if (!cleanText) throw new Error("待翻译文本为空");
+  const settings = await chrome.storage.sync.get(DEFAULTS);
+  const sourceLanguage = source || settings.source;
+  const targetLanguage = target || settings.target;
+  const names = { en: "英语", zh: "简体中文", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语" };
+  const sourceHint = sourceLanguage === "auto" ? "" : `原文是${names[sourceLanguage] || sourceLanguage}。`;
+  const targetName = names[targetLanguage] || targetLanguage;
+  const timeoutMs = Math.max(Number(settings.timeoutMs) || 12000, 24000);
+  const maxTokens = Math.min(1024, Math.max(128, Math.ceil(cleanText.length * 1.8)));
+  const model = await discoverModel(settings.serviceUrl, signal, timeoutMs);
+  const endpoint = serviceEndpoint(settings.serviceUrl, "/v1/chat/completions");
+  const request = (minimal = false) => fetchWithTimeout(endpoint, timeoutMs, {
+    model,
+    stream: false,
+    temperature: minimal ? 0 : 0.1,
+    max_tokens: maxTokens,
+    messages: [
+      {
+        role: "system",
+        content: minimal
+          ? `只把用户文本翻译成${targetName}，只输出译文。`
+          : `你是专业网页与文档翻译器。${sourceHint}将用户给出的文本自然、准确、流畅地翻译成${targetName}。保持原文的段落语气与专有名词准确性，不添加解释或多余前后缀，只输出译文。`
+      },
+      { role: "user", content: cleanText }
+    ]
+  }, cleanOpenAiResponse, signal);
+  try {
+    return await request();
+  } catch (error) {
     if (error.code !== "PROMPT_ECHO") throw error;
     return request(true);
   }
