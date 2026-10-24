@@ -36,6 +36,11 @@ async function setupContextMenus() {
       title: isEn ? "Translate / Look Up Selection with Local AI" : "使用本地 AI 翻译 / 查词选中内容",
       contexts: ["selection"]
     }, () => { void chrome.runtime.lastError; });
+    chrome.contextMenus.create({
+      id: "open-pdf-viewer",
+      title: isEn ? "Open Local AI PDF Paper Reader" : "打开本地 AI PDF 论文阅读器",
+      contexts: ["page", "frame", "link"]
+    }, () => { void chrome.runtime.lastError; });
   });
 }
 
@@ -46,6 +51,15 @@ chrome.storage.onChanged.addListener((changes) => {
 });
 
 chrome.contextMenus?.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "open-pdf-viewer") {
+    const candidateUrl = info.linkUrl || info.pageUrl || tab?.url || "";
+    const isHttpPdf = /^https?:\/\/.*\.pdf(?:[?#].*)?$/i.test(candidateUrl) || /^https?:\/\/arxiv\.org\/pdf\//i.test(candidateUrl);
+    const targetUrl = isHttpPdf
+      ? chrome.runtime.getURL(`pdf-viewer.html?url=${encodeURIComponent(candidateUrl)}`)
+      : chrome.runtime.getURL("pdf-viewer.html");
+    chrome.tabs.create({ url: targetUrl });
+    return;
+  }
   if (!tab?.id) return;
   if (info.menuItemId === "toggle-page-translation") {
     chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_PAGE_TRANSLATION" }).catch(() => {});

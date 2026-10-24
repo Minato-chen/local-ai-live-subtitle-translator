@@ -91,3 +91,17 @@ document.getElementById("togglePageTranslate").addEventListener("click", async (
 document.getElementById("options").addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
+
+document.getElementById("openPdfViewer").addEventListener("click", async () => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabUrl = tab?.url || "";
+    const isOnlinePdf = /^https?:\/\/.*\.pdf(?:[?#].*)?$/i.test(tabUrl) || /^https?:\/\/arxiv\.org\/pdf\//i.test(tabUrl);
+    const viewerUrl = isOnlinePdf
+      ? chrome.runtime.getURL(`pdf-viewer.html?url=${encodeURIComponent(tabUrl)}`)
+      : chrome.runtime.getURL("pdf-viewer.html");
+    await chrome.tabs.create({ url: viewerUrl });
+  } catch {
+    await chrome.tabs.create({ url: chrome.runtime.getURL("pdf-viewer.html") });
+  }
+});

@@ -557,7 +557,14 @@
       tags: addWebEditorField(
         "tags",
         uiText("标签", "Tags"),
-        [webSettings.ankiTags, ...SubtitleShared.sourceTags(entry.sourceTitle, location.hostname, "source-web")].filter(Boolean).join(" ")
+        [
+          webSettings.ankiTags,
+          ...SubtitleShared.sourceTags(
+            entry.sourceTitle,
+            location.hostname,
+            location.pathname.endsWith("/pdf-viewer.html") ? "source-pdf" : "source-web"
+          )
+        ].filter(Boolean).join(" ")
       )
     };
 
@@ -717,6 +724,12 @@
   // =========================================================================
 
   function togglePageTranslation() {
+    const pdfToggle = document.getElementById("toggleBilingualBtn");
+    if (pdfToggle && !pdfToggle.disabled) {
+      pdfToggle.click();
+      pageTranslationActive = pdfToggle.classList.contains("active");
+      return;
+    }
     if (pageTranslationActive) {
       restorePageTranslation();
     } else {

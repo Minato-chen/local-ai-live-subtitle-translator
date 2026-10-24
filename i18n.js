@@ -24,6 +24,7 @@ Object.assign(I18N.en, {
   "启用网页划词翻译": "Enable webpage selection translation",
   "双语翻译当前网页": "Translate Current Page (Bilingual)",
   "还原网页原文": "Restore Original Page",
+  "打开 PDF 论文阅读器": "Open PDF Paper Reader",
   "网页翻译、暂停查词与 Anki": "Webpage translation, paused lookup, and Anki",
   "在任意网页选中文本后显示“译”小图标，点击即可查词（含网页原句译文及 Anki 制卡）或整段翻译；也可通过浏览器右键菜单触发“双语翻译当前网页 / 还原原文”或“翻译选中内容”。": "Show a floating '译' icon after selecting text on any webpage to look up words (with context sentence translation & Anki export) or translate passages. You can also trigger full-page bilingual translation or selection translation from the browser right-click menu.",
   "暂停查词与 Anki": "Paused lookup and Anki",

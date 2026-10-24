@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>本地 AI 论文 PDF 阅读器</title>
+  <link rel="stylesheet" href="content.css">
+  <link rel="stylesheet" href="pdf-viewer.css">
+</head>
+<body>
+  <header class="pdf-toolbar">
+    <div class="pdf-toolbar-left">
+      <label class="pdf-btn pdf-btn-primary" for="pdfFileInput" id="openPdfLabel">打开本地 PDF</label>
+      <input id="pdfFileInput" type="file" accept=".pdf,application/pdf" hidden>
+      <span class="pdf-doc-title" id="pdfDocTitle">未打开文件（支持直接拖拽 PDF 到此页面）</span>
+    </div>
+
+    <div class="pdf-toolbar-center">
+      <button type="button" class="pdf-btn" id="prevPageBtn" title="上一页" disabled>‹</button>
+      <span class="pdf-page-indicator">
+        <input id="pageNumberInput" type="number" min="1" value="1" disabled>
+        <span>/</span>
+        <span id="pageCountSpan">0</span>
+      </span>
+      <button type="button" class="pdf-btn" id="nextPageBtn" title="下一页" disabled>›</button>
+      <span class="pdf-divider"></span>
+      <button type="button" class="pdf-btn" id="zoomOutBtn" title="缩小" disabled>−</button>
+      <select id="zoomSelect" disabled>
+        <option value="fit-width" selected>自适应宽</option>
+        <option value="0.85">85%</option>
+        <option value="1">100%</option>
+        <option value="1.25">125%</option>
+        <option value="1.5">150%</option>
+        <option value="1.75">175%</option>
+      </select>
+      <button type="button" class="pdf-btn" id="zoomInBtn" title="放大" disabled>+</button>
+    </div>
+
+    <div class="pdf-toolbar-right">
+      <div class="pdf-box-control-group">
+        <button type="button" class="pdf-btn" id="boxSelectModeBtn" title="点击后在 PDF 上拖拽画框即可精准提取并翻译框内区域" disabled>画框选取</button>
+        <label class="pdf-keep-box-check" title="勾选后保持画框状态，可连续框选多段；不勾选则画完一框后自动回到划词状态">
+          <input type="checkbox" id="keepBoxSelectCheck" disabled> 保持画框
+        </label>
+      </div>
+      <button type="button" class="pdf-btn pdf-btn-accent" id="toggleBilingualBtn" disabled>开启全文双语对照</button>
+      <button type="button" class="pdf-btn" id="toggleSidePaneBtn" title="显示/隐藏右侧对照栏">双语栏</button>
+      <button type="button" class="pdf-btn" id="openSettingsBtn" title="打开翻译与 Anki 设置">设置</button>
+    </div>
+  </header>
+
+  <main class="pdf-workspace" id="pdfWorkspace">
+    <!-- Left: Original PDF Canvas + Selectable Text Layer -->
+    <section class="pdf-canvas-pane" id="pdfCanvasPane">
+      <div class="pdf-empty-dropzone" id="pdfDropzone">
+        <div class="pdf-dropzone-card">
+          <h2>本地 AI 论文 PDF 阅读器</h2>
+          <p>将下载好的 <strong>.pdf 论文文件拖拽到此处</strong>，或点击左上角「打开本地 PDF」。</p>
+          <ul class="pdf-feature-list">
+            <li><strong>常驻划词查词 + 存 Anki</strong>：在 PDF 原文或右侧卡片上直接划选单词/句子，点击“译”查看语境释义并加入 Anki</li>
+            <li><strong>自动分段 + 手动选区双模式</strong>：顶部切换「自动分段」或「手动选区」，通过「画框选取」指哪译哪</li>
+            <li><strong>跨页拼接与编辑去换行</strong>：每段均支持「+ 追加框选」自动拼接跨页断段，或点击「编辑」手动粘贴并一键「换行转空格」</li>
+          </ul>
+          <div class="pdf-url-loader">
+            <input id="pdfUrlInput" type="url" placeholder="或粘贴在线 PDF 链接（如 https://arxiv.org/pdf/xxxx.pdf）">
+            <button type="button" class="pdf-btn pdf-btn-primary" id="loadUrlBtn">加载链接</button>
+          </div>
+        </div>
+      </div>
+      <div class="pdf-pages-list" id="pdfPagesList" hidden></div>
+    </section>
+
+    <!-- Resizer Divider -->
+    <div class="pdf-pane-resizer" id="pdfPaneResizer" title="按住拖动调整双语栏宽度"></div>
+
+    <!-- Right: Reconstructed Academic Paragraphs & Bilingual Translation Stream -->
+    <aside class="pdf-bilingual-pane" id="pdfBilingualPane">
+      <div class="pdf-bilingual-header">
+        <div class="pdf-bilingual-top-row">
+          <div class="pdf-mode-tabs" role="tablist">
+            <button type="button" class="pdf-mode-tab active" id="tabAutoMode" role="tab" aria-selected="true">自动分段</button>
+            <button type="button" class="pdf-mode-tab" id="tabManualMode" role="tab" aria-selected="false">手动选区</button>
+          </div>
+          <div class="pdf-bilingual-actions">
+            <label class="pdf-auto-check" id="autoTranslateLabel" title="开启后滚动 PDF 自动翻译可视页段落">
+              <input type="checkbox" id="autoTranslateCheck"> 自动翻译
+            </label>
+            <button type="button" class="pdf-btn pdf-btn-small" id="translateCurrentPageBtn" disabled>翻译本页</button>
+            <button type="button" class="pdf-btn pdf-btn-small" id="newBlankCardBtn" title="新建可编辑段落卡片（方便直接粘贴跨页文本并去换行翻译）">+ 粘贴段</button>
+            <button type="button" class="pdf-btn pdf-btn-small" id="exportMarkdownBtn" title="导出当前双语对照内容为 Markdown (.md)" disabled>导出</button>
+          </div>
+        </div>
+        <span class="pdf-bilingual-subtitle" id="bilingualStatusText">打开 PDF 后自动提取当前页自然段</span>
+      </div>
+
+      <!-- Tab 1 Body: Auto-segmented paragraphs (with manual adjustments) -->
+      <div class="pdf-bilingual-body" id="pdfBilingualBody">
+        <p class="pdf-bilingual-placeholder" id="bilingualPlaceholder">
+          打开 PDF 论文后，此处将按阅读顺序重组本页段落。若某段切分不准或跨页，可使用「画框选取」、卡片上的「+ 追加框选」或「编辑」。
+        </p>
+      </div>
+
+      <!-- Tab 2 Body: Pure manual box-selected / pasted paragraphs -->
+      <div class="pdf-bilingual-body" id="pdfManualBody" hidden>
+        <p class="pdf-bilingual-placeholder" id="manualPlaceholder">
+          当前为「纯手动选区」模式。<br>点击顶部 <strong>「画框选取」</strong> 在左侧 PDF 上框选任意区域，或点击右上角 <strong>「+ 粘贴段」</strong> 粘贴文本，此处将只展示你选取的段落。
+        </p>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Export Modal Dialog -->
+  <div class="pdf-modal-backdrop" id="pdfExportModal" hidden>
+    <div class="pdf-modal-card">
+      <div class="pdf-modal-header">
+        <h3 class="pdf-modal-title">导出双语对照笔记 (Markdown)</h3>
+        <button type="button" class="pdf-modal-close" id="closeExportModalBtn" aria-label="关闭">&times;</button>
+      </div>
+      <div class="pdf-modal-body">
+        <div class="pdf-modal-section">
+          <label class="pdf-modal-label">排版版式</label>
+          <div class="pdf-format-options">
+            <label class="pdf-radio-item">
+              <input type="radio" name="exportFormat" value="quote" checked>
+              <div class="pdf-radio-desc">
+                <strong>引用块对照（推荐）</strong>
+                <span><code>&gt; 原文引用</code> 紧跟译文正文，最适合 Obsidian / Notion / Typora</span>
+              </div>
+            </label>
+            <label class="pdf-radio-item">
+              <input type="radio" name="exportFormat" value="compact">
+              <div class="pdf-radio-desc">
+                <strong>紧凑双行对照</strong>
+                <span>原文与译文逐段交替，适合长文阅读与直接导出</span>
+              </div>
+            </label>
+            <label class="pdf-radio-item">
+              <input type="radio" name="exportFormat" value="table">
+              <div class="pdf-radio-desc">
+                <strong>表格双栏对照</strong>
+                <span>左栏原文、右栏译文的 Markdown 表格，适合大屏查阅</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="pdf-modal-section">
+          <label class="pdf-modal-label">导出范围与选项</label>
+          <div class="pdf-range-options">
+            <label class="pdf-checkbox-item">
+              <input type="checkbox" id="exportOnlyTranslated">
+              <span>仅导出已完成翻译的段落</span>
+            </label>
+            <label class="pdf-checkbox-item">
+              <input type="checkbox" id="exportIncludePageHeaders" checked>
+              <span>保留页码层级标题（<code>## 第 X 页</code>）</span>
+            </label>
+            <label class="pdf-checkbox-item">
+              <input type="checkbox" id="exportIncludeMetadata" checked>
+              <span>包含论文信息与导出元数据（文件名、时间、统计）</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="pdf-export-summary" id="exportSummaryText">
+          共计检测到 0 个段落（已翻译 0 段）
+        </div>
+      </div>
+
+      <div class="pdf-modal-footer">
+        <span class="pdf-modal-status" id="exportStatusMsg"></span>
+        <div class="pdf-modal-btn-group">
+          <button type="button" class="pdf-btn" id="copyMarkdownBtn">复制到剪贴板</button>
+          <button type="button" class="pdf-btn pdf-btn-primary" id="downloadMarkdownBtn">下载 .md 文件</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="lib/shared.js"></script>
+  <script src="lib/anki.js"></script>
+  <script src="lib/web-translate.js"></script>
+  <script src="lib/pdf-paragraphs.js"></script>
+  <script src="lib/pdfjs/pdf.min.js"></script>
+  <script src="web-content.js"></script>
+  <script src="pdf-viewer.js"></script>
+</body>
+</html>
