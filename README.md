@@ -11,7 +11,7 @@ Edge/Chrome 扩展：读取 Netflix、YouTube 或 Amazon Prime Video 播放器�
 
 ## 安装
 
-安装和启动示例：[观看演示视频](https://youtu.be/2KG4V-mdfIE)。
+安装和启动示例：[观看演示视频](https://b23.tv/NthVfae)。
 
 1. 安装 llama.cpp。
 
