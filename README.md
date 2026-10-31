@@ -2,12 +2,12 @@
 
 [English README](README.en.md)
 
-Edge/Chrome 扩展：读取 Netflix 或 YouTube 播放器中的原字幕，通过本机兼容 OpenAI API 的翻译服务实时显示中文字幕。默认推荐 `llama.cpp + Hy-MT2 Q4_K_M`。
+Edge/Chrome 扩展：读取 Netflix、YouTube 或 Amazon Prime Video 播放器中的原字幕，通过本机兼容 OpenAI API 的翻译服务实时显示中文字幕。默认推荐 `llama.cpp + Hy-MT2 Q4_K_M`。
 
 ## 版本
 
 - 稳定版：从 [Microsoft Edge 扩展商店](https://microsoftedge.microsoft.com/addons/detail/odmlonebpcbphjogbopioojopjecioge)安装，当前为 `v2.0.4`。
-- GitHub 正式版：从 [GitHub Releases](https://github.com/Minato-chen/local-ai-live-subtitle-translator/releases) 下载 `v2.1.0` ZIP，按下文步骤手动安装和更新。GitHub 版本不会通过 Edge 商店自动更新；建议使用单独的浏览器配置文件，避免与商店版同时运行。
+- GitHub 正式版：从 [GitHub Releases](https://github.com/Minato-chen/local-ai-live-subtitle-translator/releases) 下载 `v2.1.5` ZIP，按下文步骤手动安装和更新。GitHub 版本不会通过 Edge 商店自动更新；建议使用单独的浏览器配置文件，避免与商店版同时运行。
 
 ## 安装
 

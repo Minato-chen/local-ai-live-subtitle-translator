@@ -76,7 +76,10 @@ function isSupportedPage(url) {
   try {
     const { hostname, pathname } = new URL(url);
     if (hostname === "www.netflix.com") return /^\/watch\/\d+/.test(pathname);
-    return hostname === "www.youtube.com" && (pathname === "/watch" || pathname.startsWith("/shorts/"));
+    if (hostname === "www.youtube.com") return pathname === "/watch" || pathname.startsWith("/shorts/");
+    if (/(^|\.)primevideo\.com$/.test(hostname)) return pathname.includes("/detail/") || pathname.includes("/watch/") || pathname.includes("/region/");
+    if (/(^|\.)amazon\.(com|co\.jp|co\.uk|de|es|fr|it|ca|com\.au)$/.test(hostname)) return pathname.includes("/gp/video/") || pathname.includes("/detail/");
+    return false;
   } catch {
     return false;
   }

@@ -69,6 +69,8 @@ function isTranslationPage() {
   const host = location.hostname;
   if (host === "www.netflix.com") return /^\/watch\/\d+/.test(location.pathname);
   if (host === "www.youtube.com") return location.pathname === "/watch" || location.pathname.startsWith("/shorts/");
+  if (/(^|\.)primevideo\.com$/.test(host)) return location.pathname.includes("/detail/") || location.pathname.includes("/watch/") || location.pathname.includes("/region/") || Boolean(document.querySelector(".atvwebplayersdk-player-container, #dv-web-player, video"));
+  if (/(^|\.)amazon\.(com|co\.jp|co\.uk|de|es|fr|it|ca|com\.au)$/.test(host)) return location.pathname.includes("/gp/video/") || location.pathname.includes("/detail/") || Boolean(document.querySelector(".atvwebplayersdk-player-container, #dv-web-player"));
   return false;
 }
 
@@ -92,6 +94,8 @@ async function init() {
   });
 
   window.addEventListener("resize", () => { positionOverlay(); positionDictionaryPanel(); }, { passive: true });
+  document.addEventListener("fullscreenchange", handleFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
   document.addEventListener("mouseup", handleSelectionMouseUp);
   sourceLine.addEventListener("mousedown", beginWordBlockDrag);
   document.addEventListener("mousemove", updateWordBlockDrag);
@@ -99,6 +103,18 @@ async function init() {
   document.addEventListener("visibilitychange", () => { if (document.hidden) exitPausedInteraction(); });
   setInterval(scanSubtitles, 500);
   scanSubtitles();
+}
+
+function handleFullscreenChange() {
+  if (!overlay) return;
+  const fsElem = document.fullscreenElement || document.webkitFullscreenElement;
+  if (fsElem && !fsElem.contains(overlay)) {
+    fsElem.appendChild(overlay);
+  } else if (!fsElem && overlay.parentElement !== document.documentElement) {
+    document.documentElement.appendChild(overlay);
+  }
+  positionOverlay();
+  positionDictionaryPanel();
 }
 
 function createOverlay() {
@@ -148,7 +164,10 @@ function findSubtitleContainer() {
     ".ytp-caption-segment",
     ".player-timedtext-text-container",
     "[data-uia='player-subtitle-text']",
-    ".watch-video--timed-text"
+    ".watch-video--timed-text",
+    ".atvwebplayersdk-captions-text",
+    "[class*='atvwebplayersdk-captions-text']",
+    ".atvwebplayersdk-captions-overlay"
   ];
   for (const selector of selectors) {
     const nodes = [...document.querySelectorAll(selector)]
@@ -159,6 +178,22 @@ function findSubtitleContainer() {
 }
 
 function readSubtitle(container) {
+  // Prime Video may have multiple caption spans inside the container or sibling spans
+  if (container.classList && (container.classList.contains("atvwebplayersdk-captions-text") || container.matches("[class*='atvwebplayersdk-captions-text']"))) {
+    const parent = container.parentElement;
+    if (parent) {
+      const spans = [...parent.querySelectorAll(".atvwebplayersdk-captions-text, [class*='atvwebplayersdk-captions-text']")];
+      if (spans.length > 1) {
+        const text = spans
+          .map((s) => s.innerText || s.textContent || "")
+          .filter(Boolean)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (text) return text;
+      }
+    }
+  }
   const text = (container.innerText || container.textContent || "")
     .replace(/\s+/g, " ")
     .trim();
@@ -568,11 +603,13 @@ async function requestDictionary(term, sentence, rect, kind = "word") {
     const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, sentence, context, source: settings.source, target: settings.target });
     if (version !== lookupVersion || !videoPaused) return;
     if (!response?.ok) throw new Error(response?.error || uiText("查词失败", "Lookup failed"));
+    const titleElem = document.querySelector(".atvwebplayersdk-title-text, [class*='atvwebplayersdk-title']");
+    const sourceTitle = (titleElem?.textContent?.trim()) || document.title;
     lastDictionaryEntry = {
       ...response.entry,
       videoSentence: sentence,
       videoSentenceTranslation: "",
-      sourceTitle: document.title
+      sourceTitle
     };
     renderDictionary(lastDictionaryEntry);
     await translateDictionaryFragment(lastDictionaryEntry, version);

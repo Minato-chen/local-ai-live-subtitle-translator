@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
-  "version": "2.1.0",
-  "version_name": "2.1.0",
+  "version": "2.1.5",
+  "version_name": "2.1.5",
   "description": "__MSG_extensionDescription__",
   "default_locale": "zh_CN",
   "icons": {
@@ -15,6 +15,11 @@
   "host_permissions": [
     "https://www.netflix.com/*",
     "https://www.youtube.com/*",
+    "https://*.primevideo.com/*",
+    "https://*.amazon.com/*",
+    "https://*.amazon.co.jp/*",
+    "https://*.amazon.co.uk/*",
+    "https://*.amazon.de/*",
     "http://127.0.0.1/*",
     "http://localhost/*",
     "http://[::1]/*"

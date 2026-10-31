@@ -2,12 +2,12 @@
 
 [中文说明](README.md)
 
-An Edge/Chrome extension that reads the subtitles displayed by Netflix or YouTube, sends them to a local OpenAI-compatible translation service, and shows translated subtitles in real time. The recommended default setup is `llama.cpp + Hy-MT2 Q4_K_M`.
+An Edge/Chrome extension that reads the subtitles displayed by Netflix, YouTube, or Amazon Prime Video, sends them to a local OpenAI-compatible translation service, and shows translated subtitles in real time. The recommended default setup is `llama.cpp + Hy-MT2 Q4_K_M`.
 
 ## Versions
 
 - Stable: Install from [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/odmlonebpcbphjogbopioojopjecioge). The current store version is `v2.0.4`.
-- GitHub release: Download the `v2.1.0` ZIP from [GitHub Releases](https://github.com/Minato-chen/local-ai-live-subtitle-translator/releases) and install or update it manually as described below. The GitHub version does not update through Edge Add-ons; use a separate browser profile to avoid running it alongside the store version.
+- GitHub release: Download the `v2.1.5` ZIP from [GitHub Releases](https://github.com/Minato-chen/local-ai-live-subtitle-translator/releases) and install or update it manually as described below. The GitHub version does not update through Edge Add-ons; use a separate browser profile to avoid running it alongside the store version.
 
 ## Installation
 
