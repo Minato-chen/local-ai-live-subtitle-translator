@@ -2,6 +2,7 @@
   const WEB_DEFAULTS = {
     enabled: true,
     webSelectionEnabled: true,
+    webAutoTranslateEnabled: false,
     source: "auto",
     target: "zh",
     serviceUrl: "http://127.0.0.1:8080",
@@ -48,6 +49,14 @@
   let pageTranslatedCount = 0;
   let pageQueuedCount = 0;
   const MAX_CONCURRENT_PAGE_REQUESTS = 2;
+  let lastKnownUrl = location.href;
+
+  // Filter out tiny embedded widgets/advertisements in subframes
+  if (window !== window.top) {
+    if (window.innerWidth < 250 || window.innerHeight < 200) {
+      return;
+    }
+  }
 
   initWebTranslator();
 
@@ -69,6 +78,13 @@
       }
       updatePageStatusPill();
     });
+
+    checkAutoPageTranslate();
+
+    // Listen for SPA route changes (pushState, replaceState, popstate, or hash change)
+    window.addEventListener("popstate", onUrlChange);
+    window.addEventListener("hashchange", onUrlChange);
+    setInterval(pollUrlChange, 600);
 
     document.addEventListener("mouseup", handleDocumentMouseUp, true);
     document.addEventListener("mousedown", handleDocumentMouseDown, true);
@@ -103,6 +119,18 @@
       }
       return false;
     });
+  }
+
+  function pollUrlChange() {
+    if (location.href !== lastKnownUrl) {
+      onUrlChange();
+    }
+  }
+
+  function onUrlChange() {
+    if (location.href === lastKnownUrl) return;
+    lastKnownUrl = location.href;
+    checkAutoPageTranslate();
   }
 
   function uiText(zh, en) {
@@ -723,6 +751,35 @@
   // Full-Page Immersive Bilingual Translation
   // =========================================================================
 
+  function checkAutoPageTranslate() {
+    if (!webSettings.webAutoTranslateEnabled) return;
+    // Skip if on a video streaming page or internal pdf viewer
+    const host = location.hostname;
+    if (host === "www.netflix.com" || host === "www.youtube.com" || /(^|\.)primevideo\.com$/.test(host)) return;
+    if (location.pathname.endsWith("/pdf-viewer.html")) return;
+
+    // Check html lang attribute
+    const docLang = (document.documentElement.lang || "").toLowerCase();
+    const target = (webSettings.target || "zh").toLowerCase();
+    if (target.startsWith("zh") && (docLang.startsWith("zh") || docLang.includes("chinese"))) return;
+    if (target === "en" && docLang.startsWith("en")) return;
+    if (target === "ja" && docLang.startsWith("ja")) return;
+
+    // Sample top translatable blocks to ensure page has foreign text that needs translating
+    setTimeout(() => {
+      if (!webSettings.webAutoTranslateEnabled) return;
+      const blocks = WebTranslateLib.collectTranslatableBlocks(document.body, webSettings.target);
+      if (blocks.length >= 2) {
+        if (!pageTranslationActive) {
+          startPageTranslation();
+        } else {
+          // If translation is already active (SPA route change), scan new blocks
+          observeTranslatableBlocks(document.body);
+        }
+      }
+    }, 800);
+  }
+
   function togglePageTranslation() {
     const pdfToggle = document.getElementById("toggleBilingualBtn");
     if (pdfToggle && !pdfToggle.disabled) {
@@ -782,7 +839,9 @@
 
   function enqueueBlockForTranslation(block, session) {
     if (!block || !block.isConnected) return;
-    if (block.querySelector(":scope > [data-lai-bilingual]")) return;
+    if (block.querySelector(":scope > [data-lai-bilingual]") || block.nextElementSibling?.hasAttribute?.("data-lai-bilingual")) return;
+    if (block.closest?.("button, [role='button'], input, textarea, select")) return;
+    if (block.querySelector?.("input, textarea, select, button, [role='button']")) return;
     const sourceText = WebTranslateLib.readCleanElementText(block);
     if (!WebTranslateLib.shouldTranslateText(sourceText, webSettings.target)) return;
 
@@ -791,6 +850,7 @@
     badge.setAttribute("data-lai-bilingual", "1");
     badge.setAttribute("translate", "no");
     badge.textContent = uiText("正在翻译…", "Translating…");
+
     block.appendChild(badge);
 
     pageQueuedCount++;

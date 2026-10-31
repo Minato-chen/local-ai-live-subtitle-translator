@@ -13,6 +13,7 @@ const DEFAULTS = {
   backgroundOpacity: 40,
   position: "above",
   webSelectionEnabled: true,
+  webAutoTranslateEnabled: false,
   dictionaryEnabled: true,
   ankiEnabled: false,
   ankiUrl: "http://127.0.0.1:8765",

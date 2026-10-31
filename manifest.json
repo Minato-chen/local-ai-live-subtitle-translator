@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
-  "version": "2.1.5",
-  "version_name": "2.1.5",
+  "version": "2.1.6",
+  "version_name": "2.1.6",
   "description": "__MSG_extensionDescription__",
   "default_locale": "zh_CN",
   "icons": {
@@ -20,6 +20,7 @@
     "https://*.amazon.co.jp/*",
     "https://*.amazon.co.uk/*",
     "https://*.amazon.de/*",
+    "https://*.disneyplus.com/*",
     "http://127.0.0.1/*",
     "http://localhost/*",
     "http://[::1]/*"
@@ -32,7 +33,8 @@
       "matches": ["http://*/*", "https://*/*"],
       "js": ["lib/shared.js", "lib/anki.js", "lib/web-translate.js", "content.js", "web-content.js"],
       "css": ["content.css"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "options_page": "options.html",

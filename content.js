@@ -55,14 +55,17 @@ let wordBlockParts = null;
 let blockDrag = null;
 let lastPageKey = "";
 
-if (isTranslationPage()) init();
-else {
-  const navigationObserver = new MutationObserver(() => {
-    if (!isTranslationPage()) return;
-    navigationObserver.disconnect();
-    init();
-  });
-  navigationObserver.observe(document.documentElement, { childList: true, subtree: true });
+// For video live subtitles overlay, only run in top window (or large video frames), never in tiny ad frames
+if (window === window.top) {
+  if (isTranslationPage()) init();
+  else {
+    const navigationObserver = new MutationObserver(() => {
+      if (!isTranslationPage()) return;
+      navigationObserver.disconnect();
+      init();
+    });
+    navigationObserver.observe(document.documentElement, { childList: true, subtree: true });
+  }
 }
 
 function isTranslationPage() {
@@ -71,6 +74,7 @@ function isTranslationPage() {
   if (host === "www.youtube.com") return location.pathname === "/watch" || location.pathname.startsWith("/shorts/");
   if (/(^|\.)primevideo\.com$/.test(host)) return location.pathname.includes("/detail/") || location.pathname.includes("/watch/") || location.pathname.includes("/region/") || Boolean(document.querySelector(".atvwebplayersdk-player-container, #dv-web-player, video"));
   if (/(^|\.)amazon\.(com|co\.jp|co\.uk|de|es|fr|it|ca|com\.au)$/.test(host)) return location.pathname.includes("/gp/video/") || location.pathname.includes("/detail/") || Boolean(document.querySelector(".atvwebplayersdk-player-container, #dv-web-player"));
+  if (/(^|\.)disneyplus\.com$/.test(host)) return location.pathname.includes("/video/") || location.pathname.includes("/play/") || Boolean(document.querySelector("[data-testid='caption-container'], .dplus-native-captions, .shaka-text-container, video"));
   return false;
 }
 
@@ -167,7 +171,11 @@ function findSubtitleContainer() {
     ".watch-video--timed-text",
     ".atvwebplayersdk-captions-text",
     "[class*='atvwebplayersdk-captions-text']",
-    ".atvwebplayersdk-captions-overlay"
+    ".atvwebplayersdk-captions-overlay",
+    "[data-testid='caption-container']",
+    ".dplus-native-captions",
+    ".dplus-native-captions-text",
+    ".shaka-text-container"
   ];
   for (const selector of selectors) {
     const nodes = [...document.querySelectorAll(selector)]
@@ -603,7 +611,7 @@ async function requestDictionary(term, sentence, rect, kind = "word") {
     const response = await chrome.runtime.sendMessage({ type: "LOOKUP_WORD", requestId: lookupRequestId, term, sentence, context, source: settings.source, target: settings.target });
     if (version !== lookupVersion || !videoPaused) return;
     if (!response?.ok) throw new Error(response?.error || uiText("查词失败", "Lookup failed"));
-    const titleElem = document.querySelector(".atvwebplayersdk-title-text, [class*='atvwebplayersdk-title']");
+    const titleElem = document.querySelector(".atvwebplayersdk-title-text, [class*='atvwebplayersdk-title'], [data-testid='player-title'], .title-field");
     const sourceTitle = (titleElem?.textContent?.trim()) || document.title;
     lastDictionaryEntry = {
       ...response.entry,

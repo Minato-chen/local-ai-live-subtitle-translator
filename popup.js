@@ -3,16 +3,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   const {
     enabled = true,
     webSelectionEnabled = true,
+    webAutoTranslateEnabled = false,
+    target = "zh",
     serviceUrl = "http://127.0.0.1:8080",
     uiLanguage = "zh"
   } = await chrome.storage.sync.get({
     enabled: true,
     webSelectionEnabled: true,
+    webAutoTranslateEnabled: false,
+    target: "zh",
     serviceUrl: "http://127.0.0.1:8080",
     uiLanguage: "zh"
   });
   document.getElementById("enabled").checked = enabled;
   document.getElementById("webSelectionEnabled").checked = webSelectionEnabled;
+  const autoCheckbox = document.getElementById("webAutoTranslateEnabled");
+  if (autoCheckbox) autoCheckbox.checked = webAutoTranslateEnabled;
+  const targetSelect = document.getElementById("target");
+  if (targetSelect) targetSelect.value = target;
   checkServiceStatus(serviceUrl, uiLanguage);
   syncPageTranslationButton(uiLanguage);
 });
@@ -72,6 +80,14 @@ document.getElementById("enabled").addEventListener("change", (event) => {
 
 document.getElementById("webSelectionEnabled").addEventListener("change", (event) => {
   chrome.storage.sync.set({ webSelectionEnabled: event.target.checked });
+});
+
+document.getElementById("webAutoTranslateEnabled")?.addEventListener("change", (event) => {
+  chrome.storage.sync.set({ webAutoTranslateEnabled: event.target.checked });
+});
+
+document.getElementById("target")?.addEventListener("change", (event) => {
+  chrome.storage.sync.set({ target: event.target.value });
 });
 
 document.getElementById("togglePageTranslate").addEventListener("click", async () => {

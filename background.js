@@ -79,6 +79,7 @@ function isSupportedPage(url) {
     if (hostname === "www.youtube.com") return pathname === "/watch" || pathname.startsWith("/shorts/");
     if (/(^|\.)primevideo\.com$/.test(hostname)) return pathname.includes("/detail/") || pathname.includes("/watch/") || pathname.includes("/region/");
     if (/(^|\.)amazon\.(com|co\.jp|co\.uk|de|es|fr|it|ca|com\.au)$/.test(hostname)) return pathname.includes("/gp/video/") || pathname.includes("/detail/");
+    if (/(^|\.)disneyplus\.com$/.test(hostname)) return pathname.includes("/video/") || pathname.includes("/play/");
     return false;
   } catch {
     return false;
